@@ -156,16 +156,16 @@
     }
 
     .close-btn {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      width: 40px;
-      height: 40px;
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.1);
       border: none;
       color: white;
-      font-size: 20px;
+      font-size: 16px;
       cursor: pointer;
       z-index: 1001;
       display: flex;
@@ -174,7 +174,7 @@
     }
 
     .close-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .embed-container {
@@ -185,8 +185,8 @@
     }
 
     .embed-container iframe {
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       border: none;
     }
     
@@ -222,6 +222,16 @@
       overflow: hidden;
     }
     
+    .preview-placeholder {
+      height: 100%;
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+    
     .preview-container iframe {
       width: 100%;
       height: 100%;
@@ -234,6 +244,42 @@
       margin-top: auto;
       align-items: center;
     }
+    
+    .username-meta {
+      font-size: 0.75rem;
+      color: #93c5fd;
+      line-height: 1.4;
+    }
+    
+    .description-full {
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-top: 0.5rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    
+    .files-info {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      color: #93c5fd;
+      margin-top: 0.3rem;
+    }
+    
+    .files-symbol {
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: #93c5fd;
+      font-size: 1rem;
+    }
+    
+    .files-symbol:hover {
+      color: #60a5fa;
+    }
   </style>
 </head>
 <body>
@@ -242,7 +288,7 @@
   <h1>
     <span>📚</span> Contenta
   </h1>
-  <div class="description">A place to learn, enjoy, feel, and express—while knowing others and being active together.</div>
+  <div class="description">A place to learn, enjoy, feel, express—while knowing others and being active together.</div>
   
   <div class="media-type-selector">
     <label for="mediatype">Media Type:</label>
@@ -261,7 +307,7 @@
     <button id="filter-btn">OK</button>
   </div>
 
-  <div class="subtitle" id="subtitle">Loading all profiles…</div>
+  <div class="subtitle" id="subtitle"></div>
 
   <div class="grid" id="grid"></div>
   <div class="status" id="status">Initializing…</div>
@@ -276,6 +322,96 @@
     // Store all items for filtering
     let allItems = [];
     let currentFilter = "all";
+
+    // Embed configuration function
+    function getEmbedConfig(identifier, mediatype) {
+      switch (mediatype) {
+        case "movies":
+        case "image":
+          return {
+            type: "iframe",
+            url: `https://archive.org/embed/${identifier}`
+          };
+
+        case "audio":
+          return {
+            type: "iframe",
+            url: `https://archive.org/details/${identifier}`
+          };
+
+        case "texts":
+          return {
+            type: "text",
+            url: null
+          };
+
+        default:
+          return null;
+      }
+    }
+
+    // Helper to detect PDF files
+    async function getPdfFile(identifier) {
+      try {
+        const res = await fetch(`https://archive.org/metadata/${identifier}`);
+        const data = await res.json();
+        const files = data.files || [];
+
+        const pdf = files.find(f =>
+          f.name.toLowerCase().endsWith(".pdf") &&
+          f.source === "original"
+        );
+
+        return pdf ? pdf.name : null;
+      } catch {
+        return null;
+      }
+    }
+
+    // IntersectionObserver for lazy loading previews
+    const previewObserver = new IntersectionObserver(entries => {
+      entries.forEach(async entry => {
+        if (!entry.isIntersecting) return;
+
+        const container = entry.target;
+        const identifier = container.dataset.identifier;
+        const mediaType = container.dataset.mediatype;
+
+        // TEXTS → try PDF
+        if (mediaType === "texts") {
+          const pdfFile = await getPdfFile(identifier);
+
+          if (pdfFile) {
+            const pdfUrl = `https://archive.org/download/${identifier}/${encodeURIComponent(pdfFile)}`;
+            const viewer = `https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`;
+
+            container.innerHTML = `<iframe src="${viewer}" loading="lazy"></iframe>`;
+          } else {
+            container.innerHTML = `<div class="preview-placeholder">No PDF preview</div>`;
+          }
+
+          previewObserver.unobserve(container);
+          return;
+        }
+
+        // Other media
+        const embed = getEmbedConfig(identifier, mediaType);
+
+        if (!embed || !embed.url) {
+          container.innerHTML = `<div class="preview-placeholder">No inline preview</div>`;
+          previewObserver.unobserve(container);
+          return;
+        }
+
+        container.innerHTML =
+          `<iframe src="${embed.url}" loading="lazy" allowfullscreen></iframe>`;
+
+        previewObserver.unobserve(container);
+      });
+    }, {
+      rootMargin: "200px",
+      threshold: 0.1
+    });
 
     const stored = localStorage.getItem("archive_profile_urls");
     if (!stored) {
@@ -300,110 +436,271 @@
       return match ? match[1] : null;
     }
 
-    const rows = 1000;
-    let totalItems = 0;
-    let profilesDone = 0;
-    let allIdentifiers = [];
-    let processedIdentifiers = 0;
+    // Account state tracking
+    let accountState = {};
+    let usedThisRound = new Set();
+    // Store username mapping
+    let usernameMap = {};
 
-    // Queue for metadata processing
-    let metadataQueue = [];
-    let isProcessing = false;
+    profileUrls.forEach(url => {
+      const username = extractUsername(url);
+      if (username) {
+        usernameMap[url] = username;
+      }
+      accountState[url] = {
+        page: 1,
+        total: null,
+        exhausted: false
+      };
+    });
 
-    async function fetchMetadata(identifier) {
+    function pickRandomAccount() {
+      const available = profileUrls.filter(
+        u => !usedThisRound.has(u) && !accountState[u].exhausted
+      );
+
+      if (!available.length) {
+        usedThisRound.clear(); // start next round
+        return pickRandomAccount();
+      }
+
+      const pick = available[Math.floor(Math.random() * available.length)];
+      usedThisRound.add(pick);
+      return pick;
+    }
+
+    async function fetchThreeLatest(profileUrl) {
+      const username = usernameMap[profileUrl];
+      const state = accountState[profileUrl];
+      if (state.exhausted) return null;
+
+      const api =
+        `https://archive.org/advancedsearch.php` +
+        `?q=creator:@${username}` +
+        `&fl[]=identifier` +
+        `&fl[]=title` +
+        `&fl[]=creator` +
+        `&fl[]=publicdate` +
+        `&fl[]=mediatype` +
+        `&fl[]=description` +
+        `&fl[]=subject` +
+        `&fl[]=gmail` +
+        `&fl[]=link1` +
+        `&fl[]=link2` +
+        `&fl[]=link3` +
+        `&fl[]=phone_number` +
+        `&sort[]=publicdate desc` +
+        `&rows=3` +
+        `&page=${state.page}` +
+        `&output=json`;
+
+      const res = await fetch(api);
+      const data = await res.json();
+
+      if (state.total === null) {
+        state.total = data.response.numFound;
+      }
+
+      if (!data.response.docs.length) {
+        state.exhausted = true;
+        return null;
+      }
+
+      state.page++;
+      // Return both docs and the username
+      return {
+        docs: data.response.docs,
+        username: username
+      };
+    }
+
+    // Get original files count for an item
+    async function getOriginalFilesCount(identifier) {
       try {
         const res = await fetch(`https://archive.org/metadata/${identifier}`);
         const data = await res.json();
-        return data.metadata || {};
+        const files = data.files || [];
+        
+        // Count original files (excluding derivatives and system files)
+        const originalFiles = files.filter(file =>
+          file.source === "original" &&
+          !file.name.startsWith(".") &&
+          !file.name.toLowerCase().includes("_thumb") &&
+          !file.name.toLowerCase().includes("_preview") &&
+          !file.name.toLowerCase().includes("_spectrogram") &&
+          !file.name.toLowerCase().includes("_meta") &&
+          !file.name.toLowerCase().includes("_rules") &&
+          !file.name.match(/\.(torrent|sqlite|xml|jsonl|log|conf|md5|sha1|sha256)$/i)
+        );
+        
+        return originalFiles.length;
       } catch (err) {
-        console.error(`Failed to fetch metadata for ${identifier}`, err);
-        return {};
+        console.error(`Error fetching metadata for ${identifier}:`, err);
+        return 0;
       }
     }
 
-    function displayItem(identifier, metadata) {
+    function createCard(identifier, metadata, username) {
       const title = metadata.title || identifier;
       const creator = metadata.creator || "Unknown";
-      const uploader = metadata.uploader || "Unknown";
       const date = metadata.publicdate || "N/A";
       const tags = metadata.subject ? metadata.subject.toString().slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
-      const description = metadata.description ? metadata.description.toString().slice(0, 150) : "No description";
+      const description = metadata.description ? metadata.description.toString() : "No description";
+      const gmail = metadata.gmail;
+      const link1 = metadata.link1;
+      const link2 = metadata.link2;
+      const link3 = metadata.link3;
+      const phone_number = metadata.phone_number;
       const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
-      const embedUrl = `https://archive.org/embed/${identifier}`;
-      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}`;
-      const profileUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-profile-page-shared-links-redirecting.html?creator=${encodeURIComponent(creator)}`;
+      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?username=${username}&identifier=${identifier}`;
 
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.mediatype = mediaType;
 
-      card.innerHTML = `
+      let metaHtml = `
         <div class="title">${title}</div>
-        <div class="preview-container">
-          <iframe src="${embedUrl}" loading="lazy"></iframe>
+        <div class="preview-container"
+             data-identifier="${identifier}"
+             data-mediatype="${mediaType}">
+          <div class="preview-placeholder">Loading preview…</div>
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
-        <div class="meta"><b>Uploader:</b> ${uploader}</div>
+        <div class="username-meta"><b>Username:</b> @${username}</div>
         <div class="meta"><b>Date:</b> ${date}</div>
         <div class="meta"><b>Tags:</b> ${tags}</div>
         <div class="meta"><b>Media:</b> ${mediaType}</div>
-        <div class="meta"><b>Description:</b> ${description}</div>
+      `;
+
+      // Add optional fields only if they exist
+      if (gmail) metaHtml += `<div class="meta"><b>Gmail:</b> ${gmail}</div>`;
+      if (link1) metaHtml += `<div class="meta"><b>Link 1:</b> <a href="${link1}" target="_blank">${link1}</a></div>`;
+      if (link2) metaHtml += `<div class="meta"><b>Link 2:</b> <a href="${link2}" target="_blank">${link2}</a></div>`;
+      if (link3) metaHtml += `<div class="meta"><b>Link 3:</b> <a href="${link3}" target="_blank">${link3}</a></div>`;
+      if (phone_number) metaHtml += `<div class="meta"><b>Phone:</b> ${phone_number}</div>`;
+
+      metaHtml += `
+        <div class="description-full">${description}</div>
         <div class="meta">
           <a href="${reviewUrl}" target="_blank" class="reviews-link">Reviews</a>
         </div>
         <div class="card-actions">
-          <button class="open-btn" data-embed="${embedUrl}">Open Item</button>
-          <span class="profile-link" data-profile-url="${profileUrl}">👤</span>
-          <button class="share-btn" data-share-url="${shareUrl}" data-title="${title}" data-creator="${creator}" data-description="${description}">ᯓ➤</button>
+          <button class="open-btn">Open Item</button>
+          <button class="share-btn" data-share-url="${shareUrl}">ᯓ➤</button>
         </div>
       `;
 
-      card.querySelector(".open-btn").onclick = (e) => {
-        const embedUrl = e.target.dataset.embed;
-        openFullscreen(embedUrl);
-      };
+      card.innerHTML = metaHtml;
 
-      card.querySelector(".profile-link").onclick = (e) => {
-        const profileUrl = e.target.dataset.profileUrl;
-        window.open(profileUrl, '_blank');
+      card.querySelector(".open-btn").onclick = async () => {
+        const embed = getEmbedConfig(identifier, mediaType);
+
+        if (mediaType === "texts") {
+          const pdf = await getPdfFile(identifier);
+          if (pdf) {
+            openFullscreen(
+              `https://docs.google.com/gview?url=${encodeURIComponent(
+                `https://archive.org/download/${identifier}/${pdf}`
+              )}&embedded=true`
+            );
+            return;
+          }
+        }
+
+        if (embed && embed.url) {
+          openFullscreen(embed.url);
+        } else {
+          window.open(`https://archive.org/details/${identifier}`, "_blank");
+        }
       };
 
       card.querySelector(".share-btn").onclick = (e) => {
         const shareUrl = e.target.dataset.shareUrl;
-        const title = e.target.dataset.title;
-        const creator = e.target.dataset.creator;
-        const description = e.target.dataset.description;
-        
-        const fullShareText = `Take a look at this (${title}, ${creator}) ${shareUrl} (${description})`;
-        
         // Check if Web Share API is available
         if (navigator.share) {
           navigator.share({
             title: title,
-            text: `Take a look at this (${title}, ${creator}) (${description})`,
             url: shareUrl
           }).catch(console.error);
         } else {
           // Fallback to clipboard
-          navigator.clipboard.writeText(fullShareText).then(() => {
+          navigator.clipboard.writeText(shareUrl).then(() => {
             alert("Share link copied to clipboard!");
           }).catch(err => {
             console.error('Failed to copy: ', err);
             // Fallback prompt
-            prompt("Copy this link to share:", fullShareText);
+            prompt("Copy this link to share:", shareUrl);
           });
         }
       };
 
-      // Insert at the beginning to show newest first
-      grid.insertBefore(card, grid.firstChild);
-      
       // Store item for filtering
       allItems.push({
         element: card,
         mediatype: mediaType
       });
+      
+      // Observe preview for lazy loading
+      const preview = card.querySelector(".preview-container");
+      previewObserver.observe(preview);
+      
+      // Get original files count and add files info
+      getOriginalFilesCount(identifier).then(count => {
+        if (count > 1) {
+          const filesInfo = document.createElement("div");
+          filesInfo.className = "files-info";
+          filesInfo.innerHTML = `
+            <button class="files-symbol" title="View Playlist">${count} ᯤ</button>
+          `;
+          
+          filesInfo.querySelector(".files-symbol").onclick = () => {
+            window.location.href = `items_playlist.html?username=${encodeURIComponent(username)}&identifier=${encodeURIComponent(identifier)}`;
+          };
+          
+          // Insert before card-actions
+          const cardActions = card.querySelector(".card-actions");
+          cardActions.parentNode.insertBefore(filesInfo, cardActions);
+        }
+      });
+      
+      return card;
+    }
+
+    function renderAccountItems(profileUrl, result) {
+      const state = accountState[profileUrl];
+      const items = result.docs;
+      const username = result.username;
+      
+      // Create document fragment for batch insert
+      const fragment = document.createDocumentFragment();
+      const cards = [];
+
+      // Create cards for all items
+      items.forEach((meta, index) => {
+        const identifier = meta.identifier;
+        const card = createCard(identifier, meta, username);
+        cards.push(card);
+        fragment.appendChild(card);
+      });
+
+      // Add arrow button to the third card if there are more items
+      if (items.length > 0 && state.total > (state.page - 1) * 3) {
+        const lastCard = cards[cards.length - 1];
+        const arrow = document.createElement("button");
+        arrow.className = "open-btn";
+        arrow.textContent = "➡️";
+
+        arrow.onclick = () => {
+          window.location.href =
+            `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
+        };
+
+        lastCard.querySelector(".card-actions").appendChild(arrow);
+      }
+
+      // Append the entire batch to maintain chronological order
+      grid.appendChild(fragment);
     }
 
     function filterItems() {
@@ -418,92 +715,18 @@
       });
     }
 
-    async function processMetadataQueue() {
-      if (isProcessing) return;
-      isProcessing = true;
-
-      while (metadataQueue.length > 0) {
-        // Process up to 5 items per second
-        const batch = metadataQueue.splice(0, 5);
-        
-        const promises = batch.map(async (identifier) => {
-          const metadata = await fetchMetadata(identifier);
-          displayItem(identifier, metadata);
-          processedIdentifiers++;
-        });
-
-        await Promise.all(promises);
-        
-        status.textContent =
-          `Profiles processed: ${profilesDone}/${profileUrls.length} • Items loaded: ${totalItems} • Displayed: ${processedIdentifiers}`;
-        
-        // Apply current filter
-        filterItems();
-        
-        // Wait 1 second before next batch
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      isProcessing = false;
-    }
-
-    async function fetchProfileItems(username) {
-      let page = 1;
-      let fetched = 0;
-      let totalFound = 0;
-
+    async function mainLoop() {
       while (true) {
-        const apiUrl =
-          `https://archive.org/advancedsearch.php` +
-          `?q=creator:@${username}` +
-          `&fl[]=identifier` +
-          `&rows=${rows}` +
-          `&page=${page}` +
-          `&output=json`;
+        const account = pickRandomAccount();
 
-        const res = await fetch(apiUrl);
-        const data = await res.json();
-
-        if (page === 1) {
-          totalFound = data.response.numFound;
+        const result = await fetchThreeLatest(account);
+        if (result) {
+          renderAccountItems(account, result);
         }
 
-        const docs = data.response.docs;
-        if (!docs.length) break;
-
-        docs.forEach(item => {
-          fetched++;
-          totalItems++;
-          allIdentifiers.push(item.identifier);
-          metadataQueue.push(item.identifier);
-        });
-
-        // Start processing metadata queue
-        if (metadataQueue.length > 0 && !isProcessing) {
-          processMetadataQueue();
-        }
-
-        if (fetched >= totalFound) break;
-        page++;
+        status.textContent = "Loading more content…";
+        await new Promise(r => setTimeout(r, 600));
       }
-    }
-
-    async function processAllProfiles() {
-      for (const url of profileUrls) {
-        const username = extractUsername(url);
-        if (!username) continue;
-
-        subtitle.textContent = `Fetching uploads from @${username}…`;
-        await fetchProfileItems(username);
-        profilesDone++;
-
-        status.textContent =
-          `Profiles processed: ${profilesDone}/${profileUrls.length} • Items loaded: ${totalItems} • Displayed: ${processedIdentifiers}`;
-      }
-
-      subtitle.textContent = "All archive profiles loaded";
-      status.textContent =
-        `Completed • ${profilesDone} profiles • ${totalItems} items loaded • ${processedIdentifiers} displayed`;
     }
 
     // Fullscreen functionality
@@ -538,9 +761,9 @@
     });
 
     // Initialize
-    processAllProfiles().catch(err => {
+    mainLoop().catch(err => {
       console.error(err);
-      status.textContent = "Failed while loading archive content.";
+      status.textContent = "Error while loading content.";
     });
   </script>
 
