@@ -174,6 +174,35 @@ button {
   cursor: pointer;
   font-size: 12px;
 }
+
+.share-icon {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.load-more {
+  display: block;
+  margin: 1rem auto;
+  padding: 0.7rem 1.5rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+}
 </style>
 </head>
 
@@ -193,6 +222,7 @@ button {
   <button class="back-btn" onclick="showAllProfiles()" style="margin: 0.5rem auto;">Back to Profiles</button>
   
   <div id="grid" class="grid"></div>
+  <button id="loadMoreBtn" class="load-more" style="display: none;" onclick="loadNextBatch()">Load More</button>
 </div>
 
 <!-- Fullscreen Avatar Viewer -->
@@ -206,8 +236,12 @@ const grid = document.getElementById("grid");
 const overlay = document.getElementById("overlay");
 const fullImage = document.getElementById("fullImage");
 const searchInput = document.getElementById("searchInput");
+const loadMoreBtn = document.getElementById("loadMoreBtn");
 
 let allProfiles = [];
+let currentProfiles = [];
+const PAGE_SIZE = 30;
+let currentPage = 0;
 
 function shuffle(array){
   for(let i=array.length-1;i>0;i--){
@@ -232,35 +266,79 @@ function goToIndex() {
 }
 
 function showAllProfiles() {
-  renderProfiles(allProfiles);
+  currentProfiles = [...allProfiles];
+  currentPage = 0;
+  grid.innerHTML = '';
+  loadNextBatch();
+  loadMoreBtn.style.display = currentProfiles.length > PAGE_SIZE ? 'block' : 'none';
 }
 
 function performSearch() {
   const searchTerm = searchInput.value.toLowerCase();
   if (!searchTerm) {
-    renderProfiles(allProfiles);
+    showAllProfiles();
     return;
   }
   
-  const filtered = allProfiles.filter(profile => 
+  currentProfiles = allProfiles.filter(profile => 
     profile.username.toLowerCase().includes(searchTerm)
   );
   
-  renderProfiles(filtered);
+  currentPage = 0;
+  grid.innerHTML = '';
+  loadNextBatch();
+  loadMoreBtn.style.display = currentProfiles.length > PAGE_SIZE ? 'block' : 'none';
+}
+
+function loadNextBatch() {
+  const start = currentPage * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const batch = currentProfiles.slice(start, end);
+  
+  renderProfiles(batch);
+  
+  currentPage++;
+  
+  if (end >= currentProfiles.length) {
+    loadMoreBtn.style.display = 'none';
+  }
+}
+
+function shareProfile(username) {
+  const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-profile-page-shared-links-redirecting.html?username=${username}`;
+  
+  if (navigator.share) {
+    navigator.share({
+      title: `Check out ${username}'s profile`,
+      url: shareUrl
+    }).catch(error => console.log('Sharing failed', error));
+  } else {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert(`Link copied to clipboard for ${username}`);
+    }).catch(err => {
+      console.log('Failed to copy link', err);
+    });
+  }
 }
 
 function renderProfiles(profiles) {
-  grid.innerHTML = '';
-  
   profiles.forEach(profile => {
-    const { url, username, avatarSrc } = profile;
+    const { url, username, avatarSrc, avatar1, avatar2 } = profile;
     
     const card = document.createElement("div");
     card.className = "card";
 
     const img = document.createElement("img");
     img.className = "avatar";
-    img.src = avatarSrc;
+    img.loading = "lazy"; // Native lazy loading
+    img.src = avatar1;
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = avatar2;
+    };
+    img.onerror = () => {
+      img.src = "https://archive.org/images/glogo.png";
+    };
 
     const name = document.createElement("div");
     name.className = "username";
@@ -274,6 +352,14 @@ function renderProfiles(profiles) {
       window.location.href = "items.html";
     };
 
+    const shareIcon = document.createElement("button");
+    shareIcon.className = "share-icon";
+    shareIcon.textContent = "➤";
+    shareIcon.onclick = (e) => {
+      e.stopPropagation();
+      shareProfile(username);
+    };
+
     const fullscreenIcon = document.createElement("button");
     fullscreenIcon.className = "fullscreen-icon";
     fullscreenIcon.textContent = "⛶";
@@ -285,6 +371,7 @@ function renderProfiles(profiles) {
     card.appendChild(img);
     card.appendChild(name);
     card.appendChild(openBtn);
+    card.appendChild(shareIcon);
     card.appendChild(fullscreenIcon);
     grid.appendChild(card);
   });
@@ -304,22 +391,17 @@ if (stored) {
     const avatar2 = `https://archive.org/services/img/@${username}/uploads`;
     const fallback = "https://archive.org/images/glogo.png";
     
-    // Preload avatar with fallback logic
-    const img = new Image();
-    img.src = avatar1;
-    img.onerror = () => {
-      img.src = avatar2;
-      img.onerror = () => img.src = fallback;
-    };
-    
     return { 
       url, 
       username, 
-      avatarSrc: avatar1 // Using first avatar URL for simplicity
+      avatarSrc: avatar1,
+      avatar1,
+      avatar2,
+      fallback
     };
   });
   
-  renderProfiles(allProfiles);
+  showAllProfiles();
 }
 </script>
 
