@@ -486,11 +486,11 @@
         `&fl[]=identifier` +
         `&fl[]=title` +
         `&fl[]=creator` +
-        `&fl[]= publicdate` +
+        `&fl[]=publicdate` +
         `&fl[]=mediatype` +
         `&fl[]=description` +
         `&fl[]=subject` +
-        `&fl[]=email` +
+        `&fl[]=gmail` +  // Changed from email to gmail
         `&fl[]=phone_number` +
         `&fl[]=link1` +
         `&fl[]=link2` +
@@ -575,7 +575,7 @@
       const tags = metadata.subject ? metadata.subject.toString() : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      const email = metadata.email || "";
+      const email = metadata.gmail || "";  // Changed from email to gmail
       const phoneNumber = metadata.phone_number || "";
       const link1 = metadata.link1 || "";
       const link2 = metadata.link2 || "";
