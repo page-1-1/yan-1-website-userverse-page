@@ -206,7 +206,7 @@
     }
 
     .close-btn {
-      position: absolute;
+      position: fixed;
       top: 20px;
       right: 20px;
       width: 40px;
@@ -231,7 +231,6 @@
       width: 100%;
       height: 100%;
       border: none;
-      margin-top: 60px;
     }
     
     .share-btn {
@@ -291,6 +290,15 @@
     
     .original-files-btn:hover {
       color: #6ee7b7;
+    }
+    
+    .contact-link {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    
+    .contact-link:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -478,16 +486,15 @@
         `&fl[]=identifier` +
         `&fl[]=title` +
         `&fl[]=creator` +
-        `&fl[]=uploader` +
-        `&fl[]=publicdate` +
+        `&fl[]= publicdate` +
         `&fl[]=mediatype` +
         `&fl[]=description` +
         `&fl[]=subject` +
         `&fl[]=email` +
+        `&fl[]=phone_number` +
         `&fl[]=link1` +
         `&fl[]=link2` +
         `&fl[]=link3` +
-        `&fl[]=phone` +
         `&sort[]=publicdate desc` +
         `&rows=50` +
         `&page=${page}` +
@@ -564,16 +571,15 @@
     function createCard(identifier, metadata) {
       const title = metadata.title || identifier;
       const creator = metadata.creator || "Unknown";
-      const uploader = metadata.uploader || "Unknown";
       const date = metadata.publicdate || "N/A";
       const tags = metadata.subject ? metadata.subject.toString() : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
       const email = metadata.email || "";
+      const phoneNumber = metadata.phone_number || "";
       const link1 = metadata.link1 || "";
       const link2 = metadata.link2 || "";
       const link3 = metadata.link3 || "";
-      const phone = metadata.phone || "";
       
       const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
       const embedUrl = `https://archive.org/embed/${identifier}`;
@@ -588,13 +594,13 @@
 
       // Build contact info section
       let contactInfoHTML = '';
-      if (email || link1 || link2 || link3 || phone) {
+      if (email || phoneNumber || link1 || link2 || link3) {
         contactInfoHTML = '<div class="meta"><b>Contact Info:</b><br>';
         if (email) contactInfoHTML += `📧 ${email}<br>`;
-        if (link1) contactInfoHTML += `🔗 ${link1}<br>`;
-        if (link2) contactInfoHTML += `🔗 ${link2}<br>`;
-        if (link3) contactInfoHTML += `🔗 ${link3}<br>`;
-        if (phone) contactInfoHTML += `📞 ${phone}<br>`;
+        if (phoneNumber) contactInfoHTML += `📞 ${phoneNumber}<br>`;
+        if (link1) contactInfoHTML += `<a href="${link1}" target="_blank" class="contact-link">🔗 Link 1</a><br>`;
+        if (link2) contactInfoHTML += `<a href="${link2}" target="_blank" class="contact-link">🔗 Link 2</a><br>`;
+        if (link3) contactInfoHTML += `<a href="${link3}" target="_blank" class="contact-link">🔗 Link 3</a><br>`;
         contactInfoHTML += '</div>';
       }
 
@@ -604,7 +610,6 @@
           <div class="preview-placeholder">Preview</div>
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
-        <div class="meta"><b>Uploader:</b> ${uploader}</div>
         <div class="meta"><b>Date:</b> ${date}</div>
         <div class="meta"><b>Tags:</b> ${tags}</div>
         <div class="meta"><b>Media:</b> ${mediaType}</div>
@@ -726,15 +731,6 @@
       overlay.className = "fullscreen-overlay";
       overlay.style.zIndex = "9999";
       
-      // Create close button
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "close-btn";
-      closeBtn.innerHTML = "✕";
-      closeBtn.style.zIndex = "10000";
-      closeBtn.onclick = () => {
-        document.body.removeChild(overlay);
-      };
-      
       // Create iframe
       const iframe = document.createElement("iframe");
       iframe.className = "fullscreen-iframe";
@@ -748,18 +744,24 @@
       iframe.style.border = "none";
       iframe.style.zIndex = "9998";
       
+      // Create close button (transparent background)
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "close-btn";
+      closeBtn.innerHTML = "✕";
+      closeBtn.style.zIndex = "10000";
+      closeBtn.style.background = "rgba(0, 0, 0, 0.3)";
+      closeBtn.onclick = () => {
+        document.body.removeChild(overlay);
+        document.body.style.overflow = "auto";
+      };
+      
       // Assemble and add to body
-      overlay.appendChild(closeBtn);
       overlay.appendChild(iframe);
+      overlay.appendChild(closeBtn);
       document.body.appendChild(overlay);
       
       // Prevent scrolling when fullscreen is active
       document.body.style.overflow = "hidden";
-      
-      // Re-enable scrolling when overlay is closed
-      overlay.addEventListener('DOMNodeRemoved', function() {
-        document.body.style.overflow = "auto";
-      });
     }
 
     // Filter functions
