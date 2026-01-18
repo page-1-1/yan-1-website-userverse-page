@@ -90,13 +90,14 @@
       try {
         // Check if we have valid cached data
         if (!forceRefresh) {
-          const cachedData = localStorage.getItem("archive_metadata_cache");
+          const cachedData = localStorage.getItem("archive_profile_urls");
           if (cachedData) {
-            const { timestamp, urls } = JSON.parse(cachedData);
+            const urls = JSON.parse(cachedData);
             const now = new Date().getTime();
             
-            // Use cached data if less than 3 hours old
-            if (now - timestamp < CACHE_DURATION) {
+            // Check if cache is still valid (less than 3 hours old)
+            const cacheTimestamp = localStorage.getItem("archive_profile_urls_timestamp");
+            if (cacheTimestamp && (now - parseInt(cacheTimestamp)) < CACHE_DURATION) {
               document.getElementById("status").textContent =
                 `Loaded ${urls.length} archive profiles (cached)`;
               return;
@@ -118,15 +119,9 @@
           .map(item => item.archive_profile_url)
           .filter(Boolean);
 
-        // Store in localStorage with timestamp
-        const cacheData = {
-          timestamp: new Date().getTime(),
-          urls: urls
-        };
-        localStorage.setItem(
-          "archive_metadata_cache",
-          JSON.stringify(cacheData)
-        );
+        // Store in localStorage
+        localStorage.setItem("archive_profile_urls", JSON.stringify(urls));
+        localStorage.setItem("archive_profile_urls_timestamp", new Date().getTime().toString());
 
         document.getElementById("status").textContent =
           `Loaded ${urls.length} archive profiles`;
@@ -148,7 +143,8 @@
 
     function refreshMetadata() {
       // Clear cache and force refresh
-      localStorage.removeItem("archive_metadata_cache");
+      localStorage.removeItem("archive_profile_urls");
+      localStorage.removeItem("archive_profile_urls_timestamp");
       document.getElementById("status").textContent = "Refreshing metadata...";
       loadMetadata(true);
     }
