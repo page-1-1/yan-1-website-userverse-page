@@ -10,7 +10,7 @@
       margin: 0;
       min-height: 100vh;
       background: #020617;
-      color: #e5e7eb;
+      color: #e5e7e9;
       font-family: system-ui, -apple-system, BlinkMacSystemFont;
       padding: 1.5rem;
     }
@@ -49,7 +49,7 @@
       border-radius: 8px;
       border: 1px solid #1e293b;
       background: #0f172a;
-      color: #e5e7eb;
+      color: #e5e7e9;
       margin-right: 0.5rem;
     }
 
@@ -58,7 +58,7 @@
       border-radius: 8px;
       border: none;
       background: #1e293b;
-      color: #e5e7eb;
+      color: #e5e7e9;
       cursor: pointer;
     }
 
@@ -127,7 +127,7 @@
       border: none;
       cursor: pointer;
       background: #1e293b;
-      color: #e5e7eb;
+      color: #e5e7e9;
       font-weight: 500;
     }
 
@@ -150,12 +150,12 @@
       text-decoration: none;
       font-size: 0.9rem;
     }
-    
+
     .reviews-link {
       color: #60a5fa;
       text-decoration: none;
     }
-    
+
     .reviews-link:hover {
       text-decoration: underline;
     }
@@ -207,7 +207,7 @@
       height: 100vh;
       border: none;
     }
-    
+
     .share-btn {
       background: none;
       border: none;
@@ -217,29 +217,29 @@
       padding: 0;
       margin-left: 0.5rem;
     }
-    
+
     .share-btn:hover {
       color: #93c5fd;
     }
-    
+
     .profile-link {
       color: #60a5fa;
       text-decoration: none;
       margin-left: 5px;
       cursor: pointer;
     }
-    
+
     .profile-link:hover {
       text-decoration: underline;
     }
-    
+
     .preview-container {
       height: 150px;
       margin: 5px 0;
       border-radius: 8px;
       overflow: hidden;
     }
-    
+
     .preview-placeholder {
       height: 100%;
       background: #020617;
@@ -249,26 +249,26 @@
       color: #64748b;
       font-size: 0.8rem;
     }
-    
+
     .preview-container iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
-    
+
     .card-actions {
       display: flex;
       gap: 0.5rem;
       margin-top: auto;
       align-items: center;
     }
-    
+
     .username-meta {
       font-size: 0.75rem;
       color: #93c5fd;
       line-height: 1.4;
     }
-    
+
     .description-full {
       font-size: 0.75rem;
       color: #cbd5e1;
@@ -277,7 +277,7 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    
+
     .files-info {
       display: flex;
       align-items: center;
@@ -286,7 +286,7 @@
       color: #93c5fd;
       margin-top: 0.3rem;
     }
-    
+
     .files-symbol {
       cursor: pointer;
       background: none;
@@ -294,7 +294,7 @@
       color: #93c5fd;
       font-size: 1rem;
     }
-    
+
     .files-symbol:hover {
       color: #60a5fa;
     }
@@ -749,32 +749,36 @@
       return itemData;
     }
 
-    // Function to fetch identifiers from identifiers.html
+    // Function to fetch identifiers from identifiers.html (NEW – WORKING)
     async function fetchIdentifiers() {
-      try {
-        const response = await fetch('identifiers.html');
-        const text = await response.text();
-        
-        // Parse the HTML content
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        
-        // Extract identifiers (assuming they are in a list or similar structure)
-        const identifiers = [];
-        const identifierElements = doc.querySelectorAll('[data-identifier]');
-        
-        identifierElements.forEach(el => {
-          const identifier = el.dataset.identifier;
-          if (identifier) {
-            identifiers.push(identifier);
+      return new Promise((resolve, reject) => {
+        const iframe = document.createElement("iframe");
+        iframe.src = "identifiers.html";
+        iframe.style.display = "none";
+
+        iframe.onload = () => {
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+
+            const identifiers = [...doc.querySelectorAll("[data-identifier]")]
+              .map(el => el.dataset.identifier)
+              .filter(Boolean);
+
+            iframe.remove();
+            resolve(identifiers);
+          } catch (err) {
+            iframe.remove();
+            reject(err);
           }
-        });
-        
-        return identifiers;
-      } catch (error) {
-        console.error('Error fetching identifiers:', error);
-        return [];
-      }
+        };
+
+        iframe.onerror = () => {
+          iframe.remove();
+          reject(new Error("Failed to load identifiers.html"));
+        };
+
+        document.body.appendChild(iframe);
+      });
     }
 
     // Function to create identifier items and store them
