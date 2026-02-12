@@ -401,6 +401,12 @@
         if (!entry.isIntersecting) return;
 
         const container = entry.target;
+        // Skip containers that don’t have the data attributes (thumbnail version)
+        if (!container.dataset.identifier) {
+          previewObserver.unobserve(container);
+          return;
+        }
+
         const identifier = container.dataset.identifier;
         const mediaType = container.dataset.mediatype;
 
@@ -633,10 +639,14 @@
 
       let metaHtml = `
         <div class="title">${title}</div>
-        <div class="preview-container"
-             data-identifier="${identifier}"
-             data-mediatype="${mediaType}">
-          <div class="preview-placeholder">Loading preview…</div>
+        <div class="preview-container">
+          <img 
+            src="https://archive.org/services/img/${identifier}" 
+            alt="${title}"
+            loading="lazy"
+            style="width:100%; height:100%; object-fit:cover;"
+            onerror="this.parentElement.innerHTML='<div class=preview-placeholder>No Thumbnail</div>'"
+          />
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
       `;
@@ -722,7 +732,7 @@
       };
       allItems.push(itemData);
       
-      // Observe preview for lazy loading
+      // Observe preview for lazy loading (will be ignored for thumbnail items)
       const preview = card.querySelector(".preview-container");
       previewObserver.observe(preview);
       
