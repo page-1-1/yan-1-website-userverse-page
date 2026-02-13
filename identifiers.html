@@ -3,83 +3,149 @@
 <head>
   <meta charset="UTF-8">
   <title>Identifiers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
-    /* keep the page invisible when used as a hidden iframe */
-    body {display:none;}
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #020617;
+      color: #e5e7eb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #38bdf8;
+    }
+
+    .identifier {
+      padding: 8px;
+      margin: 6px 0;
+      background: #0f172a;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      font-size: 0.9rem;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 20px;
+      opacity: 0.8;
+      font-size: 0.85rem;
+    }
   </style>
 </head>
-
 <body>
 
+  <h2>Identifiers</h2>
+
+  <div id="identifiers"></div>
+
+  <div class="status" id="status">Loading identifiers…</div>
+
 <script>
-/* --------------------------------------------------------------
-   CONFIG – Google Sheet that holds the list of identifiers
-   -------------------------------------------------------------- */
-const SHEET_ID   = "1zGhhqc5P3Mnnm97ZJcGVI0aUXTwkYqUN5ZZwr2ycGaE";
-const SHEET_NAME = "Sheet1";                     // change if needed
-const SHEET_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
+/* ============================
+   GOOGLE SHEET CONFIG
+   ============================ */
 
-/* --------------------------------------------------------------
-   State
-   -------------------------------------------------------------- */
-let identifiers      = [];   // will contain all identifiers from the sheet
-let sheetLoaded     = false;
-let pendingRequests = [];   // callbacks waiting for the sheet to finish loading
+const sheetId = "1zGhhqc5P3Mnnm97ZJcGVI0aUXTwkYqUN5ZZwr2ycGaE";
+const sheetName = "Sheet1";
 
-/* --------------------------------------------------------------
-   Load identifiers from the Google Sheet
-   -------------------------------------------------------------- */
-fetch(SHEET_URL)
-  .then(r => r.text())
-  .then(t => {
-    // The response is not pure JSON – strip the wrapper added by Google
-    const json = JSON.parse(t.substring(47, t.length - 2));
-    const rows = json.table?.rows ?? [];
+const sheetURL =
+  `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+
+/* ============================
+   STORAGE
+   ============================ */
+
+let loadedIdentifiers = [];
+let isLoaded = false;
+
+/* ============================
+   LOAD IDENTIFIERS
+   ============================ */
+
+async function loadIdentifiers() {
+  const container = document.getElementById("identifiers");
+  const status = document.getElementById("status");
+
+  try {
+    const res = await fetch(sheetURL);
+    const text = await res.text();
+
+    const jsonText = text.match(/google\.visualization\.Query\.setResponse\((.*)\);/)[1];
+    const json = JSON.parse(jsonText);
+
+    const rows = json.table.rows;
+
+    let count = 0;
 
     rows.forEach(row => {
-      const id = row.c?.[0]?.v;
-      if (id) identifiers.push(id);
+      if (row.c && row.c[0] && row.c[0].v) {
+        const identifier = row.c[0].v.toString().trim();
+        if (!identifier) return;
+
+        loadedIdentifiers.push(identifier);
+
+        const div = document.createElement("div");
+        div.className = "identifier";
+        div.setAttribute("data-identifier", identifier);
+        div.textContent = identifier;
+
+        container.appendChild(div);
+        count++;
+      }
     });
 
-    sheetLoaded = true;
-    // Resolve any pending request(s) from the parent page
-    pendingRequests.forEach(cb => cb());
-    pendingRequests = [];
-  })
-  .catch(err => {
-    console.error("Failed to load identifiers from Google Sheet", err);
-    // Still mark as loaded so the parent doesn’t wait forever
-    sheetLoaded = true;
-    pendingRequests.forEach(cb => cb());
-    pendingRequests = [];
-  });
+    isLoaded = true;
+    status.textContent = `Loaded ${count} identifiers successfully.`;
+    console.log("Identifiers ready for Contenta.");
 
-/* --------------------------------------------------------------
-   Helper – send identifiers back to the parent window
-   -------------------------------------------------------------- */
-function postIdentifiers() {
-  // One‑shot message containing the whole array
-  const msg = {type: "identifiers", identifiers};
-  // If the parent is on another origin you may want to replace "*" with that origin
-  window.parent.postMessage(msg, "*");
+  } catch (error) {
+    console.error("Error loading sheet:", error);
+    status.textContent = "Error loading identifiers.";
+  }
 }
 
-/* --------------------------------------------------------------
-   Message listener – the parent page asks for identifiers
-   -------------------------------------------------------------- */
-window.addEventListener("message", event => {
-  const data = event.data;
-  if (!data || data.type !== "requestIdentifiers") return;
+/* ============================
+   POSTMESSAGE SUPPORT
+   (For Contenta page)
+   ============================ */
 
-  // If the sheet is already loaded, reply immediately.
-  // Otherwise push the reply onto the pending queue and send it
-  // once the fetch finishes.
-  if (sheetLoaded) {
-    postIdentifiers();
-  } else {
-    pendingRequests.push(postIdentifiers);
+window.addEventListener("message", (event) => {
+  if (!event.data) return;
+
+  if (event.data.type === "requestIdentifiers") {
+
+    // If not loaded yet, wait briefly
+    if (!isLoaded) {
+      const waitInterval = setInterval(() => {
+        if (isLoaded) {
+          clearInterval(waitInterval);
+          sendIdentifiers(event);
+        }
+      }, 100);
+    } else {
+      sendIdentifiers(event);
+    }
   }
 });
+
+function sendIdentifiers(event) {
+  event.source.postMessage({
+    type: "identifiers",
+    identifiers: loadedIdentifiers
+  }, "*");
+}
+
+/* ============================
+   INIT
+   ============================ */
+
+loadIdentifiers();
+
 </script>
 
 </body>
