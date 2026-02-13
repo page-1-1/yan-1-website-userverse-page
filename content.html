@@ -333,7 +333,7 @@
     </div>
   </div>
 
-  <button id="load-more" class="load-more-btn hidden">Load More</button>
+  <button id="load-more" class="load-more-btn">Load More</button>
   <div class="status" id="status">Initializing…</div>
 
   <script>
@@ -353,6 +353,7 @@
     // Store identifiers for later insertion
     let identifierItems = [];
     let usedIdentifiers = new Set();
+    let identifierInsertionIndex = 0;
 
     // Cache for metadata
     const metadataCache = new Map();
@@ -759,6 +760,24 @@
       });
     }
 
+    // Insert identifier items in small batches
+    function insertIdentifierBatch(batchSize = 3) {
+      if (identifierInsertionIndex >= identifierItems.length) return;
+      
+      const endIndex = Math.min(identifierInsertionIndex + batchSize, identifierItems.length);
+      
+      for (let i = identifierInsertionIndex; i < endIndex; i++) {
+        const item = identifierItems[i];
+        if (!usedIdentifiers.has(item.element.dataset.identifier)) {
+          grid.appendChild(item.element);
+          loadedCount++;
+          usedIdentifiers.add(item.element.dataset.identifier);
+        }
+      }
+      
+      identifierInsertionIndex = endIndex;
+    }
+
     // Load more items function
     async function loadMoreItems() {
       status.textContent = "Loading more content…";
@@ -766,6 +785,10 @@
       
       let loadedInThisBatch = 0;
       
+      // Insert some identifier items
+      insertIdentifierBatch(3);
+      
+      // Load profile items
       while (loadedInThisBatch < ITEMS_PER_LOAD) {
         const account = pickRandomAccount();
         const result = await fetchThreeLatest(account);
@@ -784,36 +807,28 @@
     }
 
     async function initialLoad() {
-      // Create identifier items first
-      await createIdentifierItems();
+      // Start loading identifiers in background (no await)
+      createIdentifierItems();
       
       status.textContent = "Loading content…";
       
-      // Load initial 30 items
-      while (loadedCount < ITEMS_PER_LOAD) {
+      // Load initial 6 items immediately
+      let initialLoaded = 0;
+      
+      while (initialLoaded < 6 && profileUrls.length > 0) {
         const account = pickRandomAccount();
         const result = await fetchThreeLatest(account);
         
         if (result) {
           renderAccountItems(account, result);
+          initialLoaded += result.docs.length;
         }
-        
-        // Small delay to prevent overwhelming the API
-        await new Promise(r => setTimeout(r, 100));
       }
       
-      // Display remaining identifiers at the end
-      const remainingIdentifiers = identifierItems.filter(item => 
-        !usedIdentifiers.has(item.element.dataset.identifier)
-      );
-      
-      remainingIdentifiers.forEach(item => {
-        grid.appendChild(item.element);
-        loadedCount++;
-      });
+      // Insert first batch of identifiers
+      insertIdentifierBatch(6);
       
       status.textContent = "";
-      loadMoreBtn.classList.remove("hidden");
     }
 
     // Fullscreen functionality
