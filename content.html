@@ -869,33 +869,40 @@
         grid.appendChild(itemData.element);
       });
 
-      // Add arrow button to the third card if there are more items
-      if (items.length > 0 && state.total > (state.page - 1) * 3) {
+      // ----- REPLACED ARROW BLOCK -----
+      if (items.length > 0) {
         const lastCard = newCards[newCards.length - 1].element;
-        const arrow = document.createElement("button");
-        arrow.className = "open-btn";
-        arrow.textContent = "➡️";
 
-        arrow.onclick = () => {
-          window.location.href =
-            `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
-        };
+        const moreItemsExist = state.page * 3 <= state.total;
 
-        lastCard.querySelector(".card-actions").appendChild(arrow);
-        
-        // Insert 2 identifier items after the card with the arrow
-        insertIdentifierItemsAfterCard(lastCard);
+        if (moreItemsExist) {
+          const arrow = document.createElement("button");
+          arrow.className = "open-btn";
+          arrow.textContent = "➡️";
+
+          arrow.onclick = () => {
+            window.location.href =
+              `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
+          };
+
+          lastCard.querySelector(".card-actions").appendChild(arrow);
+
+          // 🔥 Insert identifiers ONLY when arrow exists
+          insertIdentifierItemsAfterCard(lastCard);
+        }
       }
     }
 
     function insertIdentifierItemsAfterCard(card) {
       if (identifierItems.length === 0) return;
-      
-      // Take up to 2 identifier items
+
       const itemsToInsert = identifierItems.splice(0, 2);
-      
+
+      let referenceNode = card;
+
       itemsToInsert.forEach(itemData => {
-        card.after(itemData.element);
+        referenceNode.after(itemData.element);
+        referenceNode = itemData.element; // chain insertion properly
       });
     }
 
