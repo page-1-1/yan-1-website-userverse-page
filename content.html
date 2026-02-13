@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -151,14 +150,105 @@
       text-decoration: none;
       font-size: 0.9rem;
     }
-    
+
     .reviews-link {
       color: #60a5fa;
       text-decoration: none;
     }
-    
+
     .reviews-link:hover {
       text-decoration: underline;
+    }
+
+    .share-btn {
+      background: none;
+      border: none;
+      color: #60a5fa;
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 0;
+      margin-left: 0.5rem;
+    }
+
+    .share-btn:hover {
+      color: #93c5fd;
+    }
+
+    .profile-link {
+      color: #60a5fa;
+      text-decoration: none;
+      margin-left: 5px;
+      cursor: pointer;
+    }
+
+    .profile-link:hover {
+      text-decoration: underline;
+    }
+
+    .preview-container {
+      height: 150px;
+      margin: 5px 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .preview-placeholder {
+      height: 100%;
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+
+    .preview-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: auto;
+      align-items: center;
+    }
+
+    .username-meta {
+      font-size: 0.75rem;
+      color: #93c5fd;
+      line-height: 1.4;
+    }
+
+    .description-full {
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-top: 0.5rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .files-info {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      color: #93c5fd;
+      margin-top: 0.3rem;
+    }
+
+    .files-symbol {
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: #93c5fd;
+      font-size: 1rem;
+    }
+
+    .files-symbol:hover {
+      color: #60a5fa;
     }
 
     /* Fullscreen overlay styles */
@@ -208,97 +298,6 @@
       height: 100vh;
       border: none;
     }
-    
-    .share-btn {
-      background: none;
-      border: none;
-      color: #60a5fa;
-      cursor: pointer;
-      font-size: 1.2rem;
-      padding: 0;
-      margin-left: 0.5rem;
-    }
-    
-    .share-btn:hover {
-      color: #93c5fd;
-    }
-    
-    .profile-link {
-      color: #60a5fa;
-      text-decoration: none;
-      margin-left: 5px;
-      cursor: pointer;
-    }
-    
-    .profile-link:hover {
-      text-decoration: underline;
-    }
-    
-    .preview-container {
-      height: 150px;
-      margin: 5px 0;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    
-    .preview-placeholder {
-      height: 100%;
-      background: #020617;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #64748b;
-      font-size: 0.8rem;
-    }
-    
-    .preview-container iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    
-    .card-actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: auto;
-      align-items: center;
-    }
-    
-    .username-meta {
-      font-size: 0.75rem;
-      color: #93c5fd;
-      line-height: 1.4;
-    }
-    
-    .description-full {
-      font-size: 0.75rem;
-      color: #cbd5e1;
-      line-height: 1.5;
-      margin-top: 0.5rem;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    
-    .files-info {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: 0.8rem;
-      color: #93c5fd;
-      margin-top: 0.3rem;
-    }
-    
-    .files-symbol {
-      cursor: pointer;
-      background: none;
-      border: none;
-      color: #93c5fd;
-      font-size: 1rem;
-    }
-    
-    .files-symbol:hover {
-      color: #60a5fa;
-    }
   </style>
 </head>
 <body>
@@ -308,7 +307,7 @@
     <span>📚</span> Contenta
   </h1>
   <div class="description">A place to learn, enjoy, feel, express—while knowing others and being active together.</div>
-  
+
   <div class="media-type-selector">
     <label for="mediatype">Media Type:</label>
     <select id="mediatype">
@@ -337,6 +336,9 @@
 
   <div class="status" id="status">Initializing…</div>
 
+  <!-- Hidden iframe that loads identifiers.html and answers postMessage requests -->
+  <iframe id="identifiers-iframe" src="identifiers.html" style="display:none;"></iframe>
+
   <script>
     const grid = document.getElementById("grid");
     const status = document.getElementById("status");
@@ -347,11 +349,13 @@
     // Store all items for filtering
     let allItems = [];
     let currentFilter = "all";
-    
+
     // Store identifiers for later insertion
     let identifierItems = [];
 
-    // Embed configuration function
+    // -----------------------------------------------------------------
+    // Embed configuration helpers
+    // -----------------------------------------------------------------
     function getEmbedConfig(identifier, mediatype) {
       switch (mediatype) {
         case "movies":
@@ -360,25 +364,22 @@
             type: "iframe",
             url: `https://archive.org/embed/${identifier}`
           };
-
         case "audio":
           return {
             type: "iframe",
             url: `https://archive.org/details/${identifier}`
           };
-
         case "texts":
           return {
             type: "text",
             url: null
           };
-
         default:
           return null;
       }
     }
 
-    // Helper to detect PDF files
+    // Detect PDF inside a text item
     async function getPdfFile(identifier) {
       try {
         const res = await fetch(`https://archive.org/metadata/${identifier}`);
@@ -396,7 +397,9 @@
       }
     }
 
-    // IntersectionObserver for lazy loading previews
+    // -----------------------------------------------------------------
+    // Lazy‑load preview observer
+    // -----------------------------------------------------------------
     const previewObserver = new IntersectionObserver(entries => {
       entries.forEach(async entry => {
         if (!entry.isIntersecting) return;
@@ -405,35 +408,29 @@
         const identifier = container.dataset.identifier;
         const mediaType = container.dataset.mediatype;
 
-        // TEXTS → try PDF
+        // -------- Texts (try PDF) --------
         if (mediaType === "texts") {
           const pdfFile = await getPdfFile(identifier);
-
           if (pdfFile) {
             const pdfUrl = `https://archive.org/download/${identifier}/${encodeURIComponent(pdfFile)}`;
             const viewer = `https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`;
-
             container.innerHTML = `<iframe src="${viewer}" loading="lazy"></iframe>`;
           } else {
             container.innerHTML = `<div class="preview-placeholder">No PDF preview</div>`;
           }
-
           previewObserver.unobserve(container);
           return;
         }
 
-        // Other media
+        // -------- Other media types --------
         const embed = getEmbedConfig(identifier, mediaType);
-
         if (!embed || !embed.url) {
           container.innerHTML = `<div class="preview-placeholder">No inline preview</div>`;
           previewObserver.unobserve(container);
           return;
         }
 
-        container.innerHTML =
-          `<iframe src="${embed.url}" loading="lazy" allowfullscreen></iframe>`;
-
+        container.innerHTML = `<iframe src="${embed.url}" loading="lazy" allowfullscreen></iframe>`;
         previewObserver.unobserve(container);
       });
     }, {
@@ -441,6 +438,9 @@
       threshold: 0.1
     });
 
+    // -----------------------------------------------------------------
+    // Account handling
+    // -----------------------------------------------------------------
     const stored = localStorage.getItem("archive_profile_urls");
     if (!stored) {
       status.textContent = "No archive data found.";
@@ -453,50 +453,46 @@
       throw new Error("Empty list");
     }
 
-    // 🎲 Shuffle profiles (random order, no repeats)
+    // Shuffle the list so we never see the same order twice
     profileUrls = profileUrls
       .map(v => ({ v, r: Math.random() }))
       .sort((a, b) => a.r - b.r)
       .map(o => o.v);
 
     function extractUsername(url) {
-      const match = url.match(/@([^/]+)/);
-      return match ? match[1] : null;
+      const m = url.match(/@([^/]+)/);
+      return m ? m[1] : null;
     }
 
-    // Account state tracking
-    let accountState = {};
-    let usedThisRound = new Set();
-    // Store username mapping
-    let usernameMap = {};
+    // State for each profile URL
+    const accountState = {};
+    const usernameMap = {};
 
     profileUrls.forEach(url => {
       const username = extractUsername(url);
-      if (username) {
-        usernameMap[url] = username;
-      }
-      accountState[url] = {
-        page: 1,
-        total: null,
-        exhausted: false
-      };
+      if (username) usernameMap[url] = username;
+      accountState[url] = { page: 1, total: null, exhausted: false };
     });
 
-    function pickRandomAccount() {
-      const available = profileUrls.filter(
-        u => !usedThisRound.has(u) && !accountState[u].exhausted
-      );
+    // -------------------------------------------------------------
+    // Random account picker – guarantees a round‑robin style loop
+    // -------------------------------------------------------------
+    const usedThisRound = new Set();
 
+    function pickRandomAccount() {
+      const available = profileUrls.filter(u => !usedThisRound.has(u) && !accountState[u].exhausted);
       if (!available.length) {
-        usedThisRound.clear(); // start next round
+        usedThisRound.clear();
         return pickRandomAccount();
       }
-
       const pick = available[Math.floor(Math.random() * available.length)];
       usedThisRound.add(pick);
       return pick;
     }
 
+    // -------------------------------------------------------------
+    // Fetch three newest items for a given profile
+    // -------------------------------------------------------------
     async function fetchThreeLatest(profileUrl) {
       const username = usernameMap[profileUrl];
       const state = accountState[profileUrl];
@@ -505,79 +501,61 @@
       const api =
         `https://archive.org/advancedsearch.php` +
         `?q=creator:@${username}` +
-        `&fl[]=identifier` +
-        `&fl[]=title` +
-        `&fl[]=creator` +
-        `&fl[]=publicdate` +
-        `&fl[]=mediatype` +
-        `&fl[]=description` +
-        `&fl[]=subject` +
-        `&fl[]=gmail` +
-        `&fl[]=link1` +
-        `&fl[]=link2` +
-        `&fl[]=link3` +
+        `&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=publicdate&fl[]=mediatype` +
+        `&fl[]=description&fl[]=subject&fl[]=gmail&fl[]=link1&fl[]=link2&fl[]=link3` +
         `&fl[]=phone_number` +
-        `&sort[]=publicdate desc` +
-        `&rows=3` +
-        `&page=${state.page}` +
-        `&output=json`;
+        `&sort[]=publicdate desc&rows=3&page=${state.page}&output=json`;
 
       const res = await fetch(api);
       const data = await res.json();
 
-      if (state.total === null) {
-        state.total = data.response.numFound;
-      }
-
+      if (state.total === null) state.total = data.response.numFound;
       if (!data.response.docs.length) {
         state.exhausted = true;
         return null;
       }
 
       state.page++;
-      // Return both docs and the username
-      return {
-        docs: data.response.docs,
-        username: username
-      };
+      return { docs: data.response.docs, username };
     }
 
-    // Get original files count for an item
+    // -------------------------------------------------------------
+    // Count original files for a given identifier (used for playlist)
+    // -------------------------------------------------------------
     async function getOriginalFilesCount(identifier) {
       try {
         const res = await fetch(`https://archive.org/metadata/${identifier}`);
         const data = await res.json();
         const files = data.files || [];
-        
-        // Count original files (excluding derivatives and system files)
-        const originalFiles = files.filter(file =>
-          file.source === "original" &&
-          !file.name.startsWith(".") &&
-          !file.name.toLowerCase().includes("_thumb") &&
-          !file.name.toLowerCase().includes("_preview") &&
-          !file.name.toLowerCase().includes("_spectrogram") &&
-          !file.name.toLowerCase().includes("_meta") &&
-          !file.name.toLowerCase().includes("_rules") &&
-          !file.name.match(/\.(torrent|sqlite|xml|jsonl|log|conf|md5|sha1|sha256)$/i)
+
+        const original = files.filter(f =>
+          f.source === "original" &&
+          !f.name.startsWith(".") &&
+          !f.name.toLowerCase().includes("_thumb") &&
+          !f.name.toLowerCase().includes("_preview") &&
+          !f.name.toLowerCase().includes("_spectrogram") &&
+          !f.name.toLowerCase().includes("_meta") &&
+          !f.name.toLowerCase().includes("_rules") &&
+          !f.name.match(/\.(torrent|sqlite|xml|jsonl|log|conf|md5|sha1|sha256)$/i)
         );
-        
-        return originalFiles.length;
-      } catch (err) {
-        console.error(`Error fetching metadata for ${identifier}:`, err);
+        return original.length;
+      } catch (e) {
+        console.error(`Error fetching metadata for ${identifier}:`, e);
         return 0;
       }
     }
 
-    // Fetch metadata using Archive.org metadata API
+    // -------------------------------------------------------------
+    // Fetch full metadata for an identifier (fallback when API misses fields)
+    // -------------------------------------------------------------
     async function fetchIdentifierMetadata(identifier) {
       try {
         const response = await fetch(`https://archive.org/metadata/${identifier}`);
         const data = await response.json();
-        
+
         if (data.metadata) {
-          // Use metadata from the metadata API response
           return {
-            identifier: identifier,
+            identifier,
             title: data.metadata.title || identifier,
             creator: data.metadata.creator || "Unknown",
             publicdate: data.metadata.publicdate || "N/A",
@@ -594,10 +572,10 @@
       } catch (error) {
         console.error(`Error fetching metadata for ${identifier}:`, error);
       }
-      
-      // Fallback: return basic metadata
+
+      // Minimal fallback
       return {
-        identifier: identifier,
+        identifier,
         title: identifier,
         creator: "Unknown",
         publicdate: "N/A",
@@ -607,75 +585,78 @@
       };
     }
 
+    // -------------------------------------------------------------
+    // Card creation
+    // -------------------------------------------------------------
     function createCard(identifier, metadata, username = null, isIdentifierItem = false) {
       const title = metadata.title || identifier;
       const creator = metadata.creator || "Unknown";
       const date = metadata.publicdate || "N/A";
-      const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
+      const tags = metadata.subject
+        ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100)
+        : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
+
       const gmail = metadata.gmail;
       const link1 = metadata.link1;
       const link2 = metadata.link2;
       const link3 = metadata.link3;
       const phone_number = metadata.phone_number;
+
       const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
-      
-      // Modified: Add username=yanshun081 as the last parameter for identifiers
-      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
+
+      // Share URL – last param is the username; for plain identifier items we use the generic username
+      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` +
         (username ? `&username=${username}` : `&username=yanshun081`);
 
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.mediatype = mediaType;
-      if (isIdentifierItem) {
-        card.dataset.isIdentifier = "true";
-      }
+      if (isIdentifierItem) card.dataset.isIdentifier = "true";
 
-      let metaHtml = `
+      let inner = `
         <div class="title">${title}</div>
-        <div class="preview-container"
-             data-identifier="${identifier}"
-             data-mediatype="${mediaType}">
+        <div class="preview-container" data-identifier="${identifier}" data-mediatype="${mediaType}">
           <div class="preview-placeholder">Loading preview…</div>
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
       `;
 
-      // Only show username if provided (for profile items)
       if (username) {
-        metaHtml += `<div class="username-meta"><b>Username:</b> @${username}</div>`;
+        inner += `<div class="username-meta"><b>Username:</b> @${username}</div>`;
       }
 
-      metaHtml += `
+      inner += `
         <div class="meta"><b>Date:</b> ${date}</div>
         <div class="meta"><b>Tags:</b> ${tags}</div>
         <div class="meta"><b>Media:</b> ${mediaType}</div>
       `;
 
-      // Add optional fields only if they exist
-      if (gmail) metaHtml += `<div class="meta"><b>Gmail:</b> ${gmail}</div>`;
-      if (link1) metaHtml += `<div class="meta"><b>Link 1:</b> <a href="${link1}" target="_blank">${link1}</a></div>`;
-      if (link2) metaHtml += `<div class="meta"><b>Link 2:</b> <a href="${link2}" target="_blank">${link2}</a></div>`;
-      if (link3) metaHtml += `<div class="meta"><b>Link 3:</b> <a href="${link3}" target="_blank">${link3}</a></div>`;
-      if (phone_number) metaHtml += `<div class="meta"><b>Phone:</b> ${phone_number}</div>`;
+      if (gmail) inner += `<div class="meta"><b>Gmail:</b> ${gmail}</div>`;
+      if (link1) inner += `<div class="meta"><b>Link 1:</b> <a href="${link1}" target="_blank">${link1}</a></div>`;
+      if (link2) inner += `<div class="meta"><b>Link 2:</b> <a href="${link2}" target="_blank">${link2}</a></div>`;
+      if (link3) inner += `<div class="meta"><b>Link 3:</b> <a href="${link3}" target="_blank">${link3}</a></div>`;
+      if (phone_number) inner += `<div class="meta"><b>Phone:</b> ${phone_number}</div>`;
 
-      metaHtml += `
+      inner += `
         <div class="description-full">${description}</div>
-        <div class="meta">
-          <a href="${reviewUrl}" target="_blank" class="reviews-link">Reviews</a>
-        </div>
+        <div class="meta"><a href="${reviewUrl}" target="_blank" class="reviews-link">Reviews</a></div>
         <div class="card-actions">
           <button class="open-btn">Open Item</button>
           <button class="share-btn" data-share-url="${shareUrl}">ᯓ➤</button>
         </div>
       `;
 
-      card.innerHTML = metaHtml;
+      card.innerHTML = inner;
 
+      // -----------------------------------------------------------------
+      // Open button
+      // -----------------------------------------------------------------
       card.querySelector(".open-btn").onclick = async () => {
         const embed = getEmbedConfig(identifier, mediaType);
 
+        // Texts – try PDF first
         if (mediaType === "texts") {
           const pdf = await getPdfFile(identifier);
           if (pdf) {
@@ -695,157 +676,170 @@
         }
       };
 
-      card.querySelector(".share-btn").onclick = (e) => {
-        const shareUrl = e.target.dataset.shareUrl;
-        // Check if Web Share API is available
+      // -----------------------------------------------------------------
+      // Share button – Web Share API or clipboard fallback
+      // -----------------------------------------------------------------
+      card.querySelector(".share-btn").onclick = e => {
+        const u = e.target.dataset.shareUrl;
         if (navigator.share) {
-          navigator.share({
-            title: title,
-            url: shareUrl
-          }).catch(console.error);
+          navigator.share({ title, url: u }).catch(console.error);
         } else {
-          // Fallback to clipboard
-          navigator.clipboard.writeText(shareUrl).then(() => {
+          navigator.clipboard.writeText(u).then(() => {
             alert("Share link copied to clipboard!");
           }).catch(err => {
-            console.error('Failed to copy: ', err);
-            // Fallback prompt
-            prompt("Copy this link to share:", shareUrl);
+            console.error("Failed to copy:", err);
+            prompt("Copy this link to share:", u);
           });
         }
       };
 
-      // Store item for filtering
+      // -----------------------------------------------------------------
+      // Store for the global filter
+      // -----------------------------------------------------------------
       const itemData = {
         element: card,
         mediatype: mediaType,
         isIdentifier: isIdentifierItem
       };
       allItems.push(itemData);
-      
-      // Observe preview for lazy loading
+
+      // Observe preview container for lazy loading
       const preview = card.querySelector(".preview-container");
       previewObserver.observe(preview);
-      
-      // Get original files count and add files info
+
+      // -----------------------------------------------------------------
+      // Add a “files” badge if the identifier holds more than one original file
+      // -----------------------------------------------------------------
       getOriginalFilesCount(identifier).then(count => {
         if (count > 1) {
           const filesInfo = document.createElement("div");
           filesInfo.className = "files-info";
-          filesInfo.innerHTML = `
-            <button class="files-symbol" title="View Playlist">${count} ᯤ</button>
-          `;
-          
+          filesInfo.innerHTML = `<button class="files-symbol" title="View Playlist">${count} ᯤ</button>`;
           filesInfo.querySelector(".files-symbol").onclick = () => {
-            window.location.href = `items_playlist.html?identifier=${encodeURIComponent(identifier)}` + 
+            window.location.href = `items_playlist.html?identifier=${encodeURIComponent(identifier)}` +
               (username ? `&username=${encodeURIComponent(username)}` : `&username=yanshun081`);
           };
-          
-          // Insert before card-actions
-          const cardActions = card.querySelector(".card-actions");
-          cardActions.parentNode.insertBefore(filesInfo, cardActions);
+          const actions = card.querySelector(".card-actions");
+          actions.parentNode.insertBefore(filesInfo, actions);
         }
       });
-      
+
       return itemData;
     }
 
-    // Function to fetch identifiers from identifiers.html
-    async function fetchIdentifiers() {
-      try {
-        const response = await fetch('identifiers.html');
-        const text = await response.text();
-        
-        // Parse the HTML content
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        
-        // Extract identifiers (assuming they are in a list or similar structure)
-        const identifiers = [];
-        const identifierElements = doc.querySelectorAll('[data-identifier]');
-        
-        identifierElements.forEach(el => {
-          const identifier = el.dataset.identifier;
-          if (identifier) {
-            identifiers.push(identifier);
+    // -----------------------------------------------------------------
+    // Request identifiers from the hidden iframe (postMessage API)
+    // -----------------------------------------------------------------
+    function requestIdentifiersFromIframe() {
+      const iframe = document.getElementById("identifiers-iframe");
+
+      // Return a promise that resolves once the iframe replies
+      return new Promise((resolve, reject) => {
+        // Listen for the reply
+        function onMessage(event) {
+          if (!event.data) return;
+          if (event.data.type === "identifiers") {
+            window.removeEventListener("message", onMessage);
+            resolve(event.data.identifiers);
           }
-        });
-        
-        return identifiers;
-      } catch (error) {
-        console.error('Error fetching identifiers:', error);
-        return [];
-      }
+        }
+        window.addEventListener("message", onMessage);
+
+        // When the iframe is ready, ask for the list
+        function ask() {
+          iframe.contentWindow.postMessage({ type: "requestIdentifiers" }, "*");
+        }
+
+        if (iframe.contentDocument && iframe.contentDocument.readyState === "complete") {
+          ask();
+        } else {
+          // Wait for the iframe to finish loading
+          iframe.onload = ask;
+        }
+
+        // Guard against never‑responding iframe
+        setTimeout(() => {
+          window.removeEventListener("message", onMessage);
+          reject(new Error("Timed out waiting for identifiers"));
+        }, 15000);
+      });
     }
 
-    // Function to create identifier items and store them
+    // -----------------------------------------------------------------
+    // Build identifier items (called once at startup)
+    // -----------------------------------------------------------------
     async function createIdentifierItems() {
-      const identifiers = await fetchIdentifiers();
-      
-      if (identifiers.length === 0) {
-        console.log('No identifiers found');
+      let identifiers = [];
+      try {
+        identifiers = await requestIdentifiersFromIframe();
+      } catch (e) {
+        console.error("Could not retrieve identifiers via iframe:", e);
+      }
+
+      if (!identifiers || identifiers.length === 0) {
+        console.log("No identifiers found");
         return;
       }
-      
-      // Create identifier items and store them
+
       for (const identifier of identifiers) {
         try {
-          const metadata = await fetchIdentifierMetadata(identifier);
-          const itemData = createCard(identifier, metadata, null, true);
+          const meta = await fetchIdentifierMetadata(identifier);
+          const itemData = createCard(identifier, meta, null, true);
           identifierItems.push(itemData);
-        } catch (error) {
-          console.error(`Failed to create identifier item for ${identifier}:`, error);
+        } catch (e) {
+          console.error(`Failed to create identifier item for ${identifier}:`, e);
         }
       }
     }
 
+    // -----------------------------------------------------------------
+    // Render the three fetched items for a profile
+    // -----------------------------------------------------------------
     function renderAccountItems(profileUrl, result) {
       const state = accountState[profileUrl];
       const items = result.docs;
       const username = result.username;
-      
-      // Create cards for all items
+
       const newCards = [];
-      items.forEach((meta, index) => {
+      items.forEach(meta => {
         const identifier = meta.identifier;
         const itemData = createCard(identifier, meta, username, false);
         newCards.push(itemData);
         grid.appendChild(itemData.element);
       });
 
-      // Add arrow button to the third card if there are more items
-      if (items.length > 0 && state.total > (state.page - 1) * 3) {
+      // If there are more items to fetch, add an arrow on the last card
+      if (items.length && state.total > (state.page - 1) * 3) {
         const lastCard = newCards[newCards.length - 1].element;
         const arrow = document.createElement("button");
         arrow.className = "open-btn";
         arrow.textContent = "➡️";
-
         arrow.onclick = () => {
-          window.location.href =
-            `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
+          window.location.href = `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
         };
-
         lastCard.querySelector(".card-actions").appendChild(arrow);
-        
-        // Insert 2 identifier items after the card with the arrow
+
+        // Insert up to two identifier cards after the card that now has the arrow
         insertIdentifierItemsAfterCard(lastCard);
       }
     }
 
+    // -----------------------------------------------------------------
+    // Insert a couple of identifier cards after a given card
+    // -----------------------------------------------------------------
     function insertIdentifierItemsAfterCard(card) {
       if (identifierItems.length === 0) return;
-      
-      // Take up to 2 identifier items
       const itemsToInsert = identifierItems.splice(0, 2);
-      
       itemsToInsert.forEach(itemData => {
         card.after(itemData.element);
       });
     }
 
+    // -----------------------------------------------------------------
+    // Filtering (media type selector)
+    // -----------------------------------------------------------------
     function filterItems() {
       const filterValue = currentFilter;
-      
       allItems.forEach(item => {
         if (filterValue === "all" || item.mediatype === filterValue) {
           item.element.style.display = "flex";
@@ -855,60 +849,60 @@
       });
     }
 
+    // -----------------------------------------------------------------
+    // Main loop – keeps pulling items from random accounts
+    // -----------------------------------------------------------------
     async function mainLoop() {
-      // Create identifier items first
+      // First, build the identifier pool (will be consumed later)
       await createIdentifierItems();
-      
+
       while (true) {
         const account = pickRandomAccount();
-
         const result = await fetchThreeLatest(account);
         if (result) {
           renderAccountItems(account, result);
         }
-
         status.textContent = "Loading more content…";
         await new Promise(r => setTimeout(r, 600));
       }
     }
 
-    // Fullscreen functionality
+    // -----------------------------------------------------------------
+    // Full‑screen overlay
+    // -----------------------------------------------------------------
     function openFullscreen(embedUrl) {
-      // Create overlay
       const overlay = document.createElement("div");
       overlay.className = "fullscreen-overlay";
-      
-      // Create close button
+
       const closeBtn = document.createElement("button");
       closeBtn.className = "close-btn";
       closeBtn.innerHTML = "✕";
-      closeBtn.onclick = () => {
-        document.body.removeChild(overlay);
-      };
-      
-      // Create embed container
+      closeBtn.onclick = () => document.body.removeChild(overlay);
+
       const embedContainer = document.createElement("div");
       embedContainer.className = "embed-container";
       embedContainer.innerHTML = `<iframe src="${embedUrl}" allowfullscreen></iframe>`;
-      
-      // Assemble and add to body
+
       overlay.appendChild(closeBtn);
       overlay.appendChild(embedContainer);
       document.body.appendChild(overlay);
     }
 
-    // Event listeners
+    // -----------------------------------------------------------------
+    // UI event listeners
+    // -----------------------------------------------------------------
     filterBtn.addEventListener("click", () => {
       currentFilter = mediatypeSelect.value;
       filterItems();
     });
 
-    // Initialize
+    // -----------------------------------------------------------------
+    // Kick‑off
+    // -----------------------------------------------------------------
     mainLoop().catch(err => {
       console.error(err);
       status.textContent = "Error while loading content.";
     });
   </script>
-
 </body>
 </html>
