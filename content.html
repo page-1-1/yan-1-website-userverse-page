@@ -318,14 +318,6 @@
     .hidden {
       display: none;
     }
-    
-    .remaining-header {
-      text-align: center;
-      margin-top: 2rem;
-      color: #38bdf8;
-      font-size: 1.2rem;
-      width: 100%;
-    }
   </style>
 </head>
 <body>
@@ -382,7 +374,6 @@
     // Store identifiers for later insertion
     let identifierItems = [];
     let usedIdentifiers = new Set();
-    let remainingIdentifiers = [];
 
     // Cache for metadata
     const metadataCache = new Map();
@@ -828,4 +819,109 @@
       
       allItems.forEach(item => {
         if (filterValue === "all" || item.mediatype === filterValue) {
-          item*_
+          item.element.style.display = "flex";
+        } else {
+          item.element.style.display = "none";
+        }
+      });
+    }
+
+    // Load more items function
+    async function loadMoreItems() {
+      status.textContent = "Loading more content…";
+      loadMoreBtn.disabled = true;
+      
+      let loadedInThisBatch = 0;
+      
+      while (loadedInThisBatch < ITEMS_PER_LOAD) {
+        const account = pickRandomAccount();
+        const result = await fetchThreeLatest(account);
+        
+        if (result) {
+          renderAccountItems(account, result);
+          loadedInThisBatch += result.docs.length;
+        }
+        
+        // Small delay to prevent overwhelming the API
+        await new Promise(r => setTimeout(r, 100));
+      }
+      
+      status.textContent = "";
+      loadMoreBtn.disabled = false;
+    }
+
+    async function initialLoad() {
+      // Create identifier items first
+      await createIdentifierItems();
+      
+      status.textContent = "Loading content…";
+      
+      // Load initial 30 items
+      while (loadedCount < ITEMS_PER_LOAD) {
+        const account = pickRandomAccount();
+        const result = await fetchThreeLatest(account);
+        
+        if (result) {
+          renderAccountItems(account, result);
+        }
+        
+        // Small delay to prevent overwhelming the API
+        await new Promise(r => setTimeout(r, 100));
+      }
+      
+      // Display remaining identifiers at the end
+      const remainingIdentifiers = identifierItems.filter(item => 
+        !usedIdentifiers.has(item.element.dataset.identifier)
+      );
+      
+      remainingIdentifiers.forEach(item => {
+        grid.appendChild(item.element);
+        loadedCount++;
+      });
+      
+      status.textContent = "";
+      loadMoreBtn.classList.remove("hidden");
+    }
+
+    // Fullscreen functionality
+    function openFullscreen(url) {
+      // Create overlay
+      const overlay = document.createElement("div");
+      overlay.className = "fullscreen-overlay";
+      
+      // Create close button
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "close-btn";
+      closeBtn.innerHTML = "✕";
+      closeBtn.onclick = () => {
+        document.body.removeChild(overlay);
+      };
+      
+      // Create embed container
+      const embedContainer = document.createElement("div");
+      embedContainer.className = "embed-container";
+      embedContainer.innerHTML = `<iframe src="${url}" allowfullscreen></iframe>`;
+      
+      // Assemble and add to body
+      overlay.appendChild(closeBtn);
+      overlay.appendChild(embedContainer);
+      document.body.appendChild(overlay);
+    }
+
+    // Event listeners
+    filterBtn.addEventListener("click", () => {
+      currentFilter = mediatypeSelect.value;
+      filterItems();
+    });
+    
+    loadMoreBtn.addEventListener("click", loadMoreItems);
+
+    // Initialize
+    initialLoad().catch(err => {
+      console.error(err);
+      status.textContent = "Error while loading content.";
+    });
+  </script>
+
+</body>
+</html>
