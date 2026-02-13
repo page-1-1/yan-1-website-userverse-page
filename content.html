@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>Contenta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
     body {
       margin: 0;
@@ -352,8 +351,8 @@
     
     // Store identifiers for later insertion
     let identifierItems = [];
+    let allIdentifiers = []; // Combined list of identifiers
     let usedIdentifiers = new Set();
-    let identifierInsertionIndex = 0;
 
     // Cache for metadata
     const metadataCache = new Map();
@@ -667,8 +666,11 @@
         return;
       }
       
+      // Combine identifiers from identifiers.html with API identifiers
+      allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
+      
       // Create identifier items and store them
-      for (const identifier of identifiers) {
+      for (const identifier of allIdentifiers) {
         try {
           const metadata = await fetchIdentifierMetadata(identifier);
           const itemData = createCard(identifier, metadata, null, true);
@@ -679,7 +681,7 @@
       }
     }
 
-    // Pick 3 random identifiers ensuring no duplicates
+    // Pick random identifiers ensuring no duplicates
     function pickRandomIdentifiers(count = 3) {
       if (identifierItems.length === 0) return [];
       
@@ -720,27 +722,14 @@
         loadedCount++;
       });
 
-      // Add arrow button to the third card if there are more items
-      if (items.length > 0 && state.total > (state.page - 1) * 3) {
-        const lastCard = newCards[newCards.length - 1].element;
-        const arrow = document.createElement("button");
-        arrow.className = "open-btn";
-        arrow.textContent = "➡️";
-
-        arrow.onclick = () => {
-          window.location.href =
-            `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
-        };
-
-        lastCard.querySelector(".card-actions").appendChild(arrow);
-        
-        // Insert 3 random identifier items after the card with the arrow
-        const randomIdentifiers = pickRandomIdentifiers(3);
-        randomIdentifiers.forEach(itemData => {
-          lastCard.after(itemData.element);
+      // Insert random identifier items after each profile item
+      const randomIdentifiers = pickRandomIdentifiers(items.length);
+      randomIdentifiers.forEach((itemData, index) => {
+        if (newCards[index]) {
+          newCards[index].element.after(itemData.element);
           loadedCount++;
-        });
-      }
+        }
+      });
       
       // Show load more button if we've loaded initial batch
       if (loadedCount >= ITEMS_PER_LOAD) {
@@ -762,20 +751,19 @@
 
     // Insert identifier items in small batches
     function insertIdentifierBatch(batchSize = 3) {
-      if (identifierInsertionIndex >= identifierItems.length) return;
+      if (identifierItems.length === 0) return;
       
-      const endIndex = Math.min(identifierInsertionIndex + batchSize, identifierItems.length);
+      const shuffledIdentifiers = [...identifierItems]
+        .sort(() => 0.5 - Math.random())
+        .slice(0, batchSize);
       
-      for (let i = identifierInsertionIndex; i < endIndex; i++) {
-        const item = identifierItems[i];
-        if (!usedIdentifiers.has(item.element.dataset.identifier)) {
-          grid.appendChild(item.element);
+      shuffledIdentifiers.forEach(itemData => {
+        if (!usedIdentifiers.has(itemData.element.dataset.identifier)) {
+          grid.appendChild(itemData.element);
           loadedCount++;
-          usedIdentifiers.add(item.element.dataset.identifier);
+          usedIdentifiers.add(itemData.element.dataset.identifier);
         }
-      }
-      
-      identifierInsertionIndex = endIndex;
+      });
     }
 
     // Load more items function
@@ -808,7 +796,7 @@
 
     async function initialLoad() {
       // Start loading identifiers in background (no await)
-      createIdentifierItems();
+      await createIdentifierItems();
       
       status.textContent = "Loading content…";
       
