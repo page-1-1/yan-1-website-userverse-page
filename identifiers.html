@@ -1,20 +1,152 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Identifiers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #020617;
+      color: #e5e7eb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #38bdf8;
+    }
+
+    .identifier {
+      padding: 8px;
+      margin: 6px 0;
+      background: #0f172a;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      font-size: 0.9rem;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 20px;
+      opacity: 0.8;
+      font-size: 0.85rem;
+    }
+  </style>
 </head>
 <body>
-  <div data-identifier="2026-01-24-india-latest-news"></div>
-  <div data-identifier="example_identifier_2"></div>
-  <div data-identifier="example_identifier_3"></div>
-  <div data-identifier="example_identifier_4"></div>
-  <div data-identifier="example_identifier_5"></div>
-  <div data-identifier="example_identifier_6"></div>
-  <div data-identifier="example_identifier_7"></div>
-  <div data-identifier="example_identifier_8"></div>
-  <div data-identifier="example_identifier_9"></div>
-  <div data-identifier="example_identifier_10"></div>
+
+  <h2>Identifiers</h2>
+
+  <div id="identifiers"></div>
+
+  <div class="status" id="status">Loading identifiers…</div>
+
+<script>
+/* ============================
+   GOOGLE SHEET CONFIG
+   ============================ */
+
+const sheetId = "1zGhhqc5P3Mnnm97ZJcGVI0aUXTwkYqUN5ZZwr2ycGaE";
+const sheetName = "Sheet1";
+
+const sheetURL =
+  `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+
+/* ============================
+   STORAGE
+   ============================ */
+
+let loadedIdentifiers = [];
+let isLoaded = false;
+
+/* ============================
+   LOAD IDENTIFIERS
+   ============================ */
+
+async function loadIdentifiers() {
+  const container = document.getElementById("identifiers");
+  const status = document.getElementById("status");
+
+  try {
+    const res = await fetch(sheetURL);
+    const text = await res.text();
+
+    const jsonText = text.match(/google\.visualization\.Query\.setResponse\((.*)\);/)[1];
+    const json = JSON.parse(jsonText);
+
+    const rows = json.table.rows;
+
+    let count = 0;
+
+    rows.forEach(row => {
+      if (row.c && row.c[0] && row.c[0].v) {
+        const identifier = row.c[0].v.toString().trim();
+        if (!identifier) return;
+
+        loadedIdentifiers.push(identifier);
+
+        const div = document.createElement("div");
+        div.className = "identifier";
+        div.setAttribute("data-identifier", identifier);
+        div.textContent = identifier;
+
+        container.appendChild(div);
+        count++;
+      }
+    });
+
+    isLoaded = true;
+    status.textContent = `Loaded ${count} identifiers successfully.`;
+    console.log("Identifiers ready for Contenta.");
+
+  } catch (error) {
+    console.error("Error loading sheet:", error);
+    status.textContent = "Error loading identifiers.";
+  }
+}
+
+/* ============================
+   POSTMESSAGE SUPPORT
+   (For Contenta page)
+   ============================ */
+
+window.addEventListener("message", (event) => {
+  if (!event.data) return;
+
+  if (event.data.type === "requestIdentifiers") {
+
+    // If not loaded yet, wait briefly
+    if (!isLoaded) {
+      const waitInterval = setInterval(() => {
+        if (isLoaded) {
+          clearInterval(waitInterval);
+          sendIdentifiers(event);
+        }
+      }, 100);
+    } else {
+      sendIdentifiers(event);
+    }
+  }
+});
+
+function sendIdentifiers(event) {
+  event.source.postMessage({
+    type: "identifiers",
+    identifiers: loadedIdentifiers
+  }, "*");
+}
+
+/* ============================
+   INIT
+   ============================ */
+
+loadIdentifiers();
+
+</script>
+
 </body>
 </html>
