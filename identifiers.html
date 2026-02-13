@@ -3,44 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <title>Identifiers</title>
+  <style>
+    /* keep the page invisible when used as a hidden iframe */
+    body {display:none;}
+  </style>
 </head>
 
-<body style="display:none">
+<body>
 
 <script>
-/* ===============================
-   GOOGLE SHEET CONFIG
-   =============================== */
+/* --------------------------------------------------------------
+   CONFIG – Google Sheet that holds the list of identifiers
+   -------------------------------------------------------------- */
+const SHEET_ID   = "1zGhhqc5P3Mnnm97ZJcGVI0aUXTwkYqUN5ZZwr2ycGaE";
+const SHEET_NAME = "Sheet1";                     // change if needed
+const SHEET_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
 
-const SHEET_ID = "1zGhhqc5P3Mnnm97ZJcGVI0aUXTwkYqUN5ZZwr2ycGaE";
-const SHEET_NAME = "Sheet1"; // change if needed
+/* --------------------------------------------------------------
+   State
+   -------------------------------------------------------------- */
+let identifiers      = [];   // will contain all identifiers from the sheet
+let sheetLoaded     = false;
+let pendingRequests = [];   // callbacks waiting for the sheet to finish loading
 
-const SHEET_URL =
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
-
-/* ===============================
-   LOAD IDENTIFIERS FROM SHEET
-   =============================== */
-
+/* --------------------------------------------------------------
+   Load identifiers from the Google Sheet
+   -------------------------------------------------------------- */
 fetch(SHEET_URL)
-  .then(res => res.text())
-  .then(text => {
-    const json = JSON.parse(text.substring(47, text.length - 2));
-    const rows = json.table.rows;
+  .then(r => r.text())
+  .then(t => {
+    // The response is not pure JSON – strip the wrapper added by Google
+    const json = JSON.parse(t.substring(47, t.length - 2));
+    const rows = json.table?.rows ?? [];
 
     rows.forEach(row => {
-      const identifier = row.c?.[0]?.v;
-      if (!identifier) return;
-
-      const div = document.createElement("div");
-      div.setAttribute("data-identifier", identifier);
-
-      document.body.appendChild(div);
+      const id = row.c?.[0]?.v;
+      if (id) identifiers.push(id);
     });
+
+    sheetLoaded = true;
+    // Resolve any pending request(s) from the parent page
+    pendingRequests.forEach(cb => cb());
+    pendingRequests = [];
   })
   .catch(err => {
     console.error("Failed to load identifiers from Google Sheet", err);
+    // Still mark as loaded so the parent doesn’t wait forever
+    sheetLoaded = true;
+    pendingRequests.forEach(cb => cb());
+    pendingRequests = [];
   });
+
+/* --------------------------------------------------------------
+   Helper – send identifiers back to the parent window
+   -------------------------------------------------------------- */
+function postIdentifiers() {
+  // One‑shot message containing the whole array
+  const msg = {type: "identifiers", identifiers};
+  // If the parent is on another origin you may want to replace "*" with that origin
+  window.parent.postMessage(msg, "*");
+}
+
+/* --------------------------------------------------------------
+   Message listener – the parent page asks for identifiers
+   -------------------------------------------------------------- */
+window.addEventListener("message", event => {
+  const data = event.data;
+  if (!data || data.type !== "requestIdentifiers") return;
+
+  // If the sheet is already loaded, reply immediately.
+  // Otherwise push the reply onto the pending queue and send it
+  // once the fetch finishes.
+  if (sheetLoaded) {
+    postIdentifiers();
+  } else {
+    pendingRequests.push(postIdentifiers);
+  }
+});
 </script>
 
 </body>
