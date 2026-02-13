@@ -88,8 +88,8 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
     }
 
     .card {
@@ -180,7 +180,7 @@
       width: 30px;
       height: 30px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 0, 0, 0.3); /* Light transparent red */
       border: none;
       color: white;
       font-size: 16px;
@@ -192,7 +192,7 @@
     }
 
     .close-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 0, 0, 0.5);
     }
 
     .embed-container {
@@ -234,7 +234,7 @@
     }
     
     .preview-container {
-      height: 150px;
+      height: 200px; /* Increased height */
       margin: 5px 0;
       border-radius: 8px;
       overflow: hidden;
@@ -276,27 +276,6 @@
       margin-top: 0.5rem;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-    
-    .files-info {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: 0.8rem;
-      color: #93c5fd;
-      margin-top: 0.3rem;
-    }
-    
-    .files-symbol {
-      cursor: pointer;
-      background: none;
-      border: none;
-      color: #93c5fd;
-      font-size: 1rem;
-    }
-    
-    .files-symbol:hover {
-      color: #60a5fa;
     }
     
     .load-more-btn {
@@ -512,32 +491,6 @@
       };
     }
 
-    // Get original files count for an item
-    async function getOriginalFilesCount(identifier) {
-      try {
-        const res = await fetch(`https://archive.org/metadata/${identifier}`);
-        const data = await res.json();
-        const files = data.files || [];
-        
-        // Count original files (excluding derivatives and system files)
-        const originalFiles = files.filter(file =>
-          file.source === "original" &&
-          !file.name.startsWith(".") &&
-          !file.name.toLowerCase().includes("_thumb") &&
-          !file.name.toLowerCase().includes("_preview") &&
-          !file.name.toLowerCase().includes("_spectrogram") &&
-          !file.name.toLowerCase().includes("_meta") &&
-          !file.name.toLowerCase().includes("_rules") &&
-          !file.name.match(/\.(torrent|sqlite|xml|jsonl|log|conf|md5|sha1|sha256)$/i)
-        );
-        
-        return originalFiles.length;
-      } catch (err) {
-        console.error(`Error fetching metadata for ${identifier}:`, err);
-        return 0;
-      }
-    }
-
     // Fetch metadata using Archive.org metadata API with caching
     async function fetchIdentifierMetadata(identifier) {
       if (metadataCache.has(identifier)) {
@@ -672,26 +625,6 @@
       // Observe thumbnail for lazy loading
       const preview = card.querySelector(".preview-container");
       thumbnailObserver.observe(preview);
-      
-      // Get original files count and add files info
-      getOriginalFilesCount(identifier).then(count => {
-        if (count > 1) {
-          const filesInfo = document.createElement("div");
-          filesInfo.className = "files-info";
-          filesInfo.innerHTML = `
-            <button class="files-symbol" title="View Playlist">${count} ᯤ</button>
-          `;
-          
-          filesInfo.querySelector(".files-symbol").onclick = () => {
-            window.location.href = `items_playlist.html?identifier=${encodeURIComponent(identifier)}` + 
-              (username ? `&username=${encodeURIComponent(username)}` : `&username=yanshun081`);
-          };
-          
-          // Insert before card-actions
-          const cardActions = card.querySelector(".card-actions");
-          cardActions.parentNode.insertBefore(filesInfo, cardActions);
-        }
-      });
       
       return itemData;
     }
