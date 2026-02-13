@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
       margin: 0;
       min-height: 100vh;
       background: #020617;
-      color: #e5e7e9;
+      color: #e5e7eb;
       font-family: system-ui, -apple-system, BlinkMacSystemFont;
       padding: 1.5rem;
     }
@@ -49,7 +50,7 @@
       border-radius: 8px;
       border: 1px solid #1e293b;
       background: #0f172a;
-      color: #e5e7e9;
+      color: #e5e7eb;
       margin-right: 0.5rem;
     }
 
@@ -58,7 +59,7 @@
       border-radius: 8px;
       border: none;
       background: #1e293b;
-      color: #e5e7e9;
+      color: #e5e7eb;
       cursor: pointer;
     }
 
@@ -127,7 +128,7 @@
       border: none;
       cursor: pointer;
       background: #1e293b;
-      color: #e5e7e9;
+      color: #e5e7eb;
       font-weight: 500;
     }
 
@@ -150,16 +151,17 @@
       text-decoration: none;
       font-size: 0.9rem;
     }
-
+    
     .reviews-link {
       color: #60a5fa;
       text-decoration: none;
     }
-
+    
     .reviews-link:hover {
       text-decoration: underline;
     }
 
+    /* Fullscreen overlay styles */
     .fullscreen-overlay {
       position: fixed;
       top: 0;
@@ -206,7 +208,7 @@
       height: 100vh;
       border: none;
     }
-
+    
     .share-btn {
       background: none;
       border: none;
@@ -216,29 +218,29 @@
       padding: 0;
       margin-left: 0.5rem;
     }
-
+    
     .share-btn:hover {
       color: #93c5fd;
     }
-
+    
     .profile-link {
       color: #60a5fa;
       text-decoration: none;
       margin-left: 5px;
       cursor: pointer;
     }
-
+    
     .profile-link:hover {
       text-decoration: underline;
     }
-
+    
     .preview-container {
       height: 150px;
       margin: 5px 0;
       border-radius: 8px;
       overflow: hidden;
     }
-
+    
     .preview-placeholder {
       height: 100%;
       background: #020617;
@@ -248,26 +250,26 @@
       color: #64748b;
       font-size: 0.8rem;
     }
-
+    
     .preview-container iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
-
+    
     .card-actions {
       display: flex;
       gap: 0.5rem;
       margin-top: auto;
       align-items: center;
     }
-
+    
     .username-meta {
       font-size: 0.75rem;
       color: #93c5fd;
       line-height: 1.4;
     }
-
+    
     .description-full {
       font-size: 0.75rem;
       color: #cbd5e1;
@@ -276,7 +278,7 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
+    
     .files-info {
       display: flex;
       align-items: center;
@@ -285,7 +287,7 @@
       color: #93c5fd;
       margin-top: 0.3rem;
     }
-
+    
     .files-symbol {
       cursor: pointer;
       background: none;
@@ -293,7 +295,7 @@
       color: #93c5fd;
       font-size: 1rem;
     }
-
+    
     .files-symbol:hover {
       color: #60a5fa;
     }
@@ -400,12 +402,6 @@
         if (!entry.isIntersecting) return;
 
         const container = entry.target;
-        // Skip containers that don’t have the data attributes (thumbnail version)
-        if (!container.dataset.identifier) {
-          previewObserver.unobserve(container);
-          return;
-        }
-
         const identifier = container.dataset.identifier;
         const mediaType = container.dataset.mediatype;
 
@@ -638,14 +634,10 @@
 
       let metaHtml = `
         <div class="title">${title}</div>
-        <div class="preview-container">
-          <img 
-            src="https://archive.org/services/img/${identifier}" 
-            alt="${title}"
-            loading="lazy"
-            style="width:100%; height:100%; object-fit:cover;"
-            onerror="this.parentElement.innerHTML='<div class=preview-placeholder>No Thumbnail</div>'"
-          />
+        <div class="preview-container"
+             data-identifier="${identifier}"
+             data-mediatype="${mediaType}">
+          <div class="preview-placeholder">Loading preview…</div>
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
       `;
@@ -731,10 +723,8 @@
       };
       allItems.push(itemData);
       
-      // Observe preview for lazy loading (will be ignored for thumbnail items)
+      // Observe preview for lazy loading
       const preview = card.querySelector(".preview-container");
-      preview.dataset.identifier = identifier;      // <-- added
-      preview.dataset.mediatype = mediaType;       // <-- added
       previewObserver.observe(preview);
       
       // Get original files count and add files info
@@ -760,80 +750,33 @@
       return itemData;
     }
 
-    // ----------------------------------------------------------------------
-    // NEW fetchIdentifiers – communicates via postMessage instead of DOM read
-    // ----------------------------------------------------------------------
+    // Function to fetch identifiers from identifiers.html
     async function fetchIdentifiers() {
-      return new Promise((resolve, reject) => {
+      try {
+        const response = await fetch('identifiers.html');
+        const text = await response.text();
+        
+        // Parse the HTML content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        
+        // Extract identifiers (assuming they are in a list or similar structure)
         const identifiers = [];
-
-        // Create a hidden iframe that loads identifiers.html
-        const iframe = document.createElement("iframe");
-        iframe.src = "identifiers.html";
-        iframe.style.display = "none";
-
-        // Message handler – will receive identifiers from the iframe
-        function onMessage(event) {
-          // Ensure the message comes from the iframe we created
-          if (event.source !== iframe.contentWindow) return;
-
-          const data = event.data;
-          if (!data) return;
-
-          // Expect either {type:'identifiers', identifiers:[...] } 
-          // or {type:'identifier', identifier:'abc'} for streamed messages
-          if (data.type === "identifiers" && Array.isArray(data.identifiers)) {
-            identifiers.push(...data.identifiers);
-            finish();
-          } else if (data.type === "identifier" && data.identifier) {
-            identifiers.push(data.identifier);
-            // Reset timeout – we’ll finish once messages stop arriving
-            resetFinishTimer();
+        const identifierElements = doc.querySelectorAll('[data-identifier]');
+        
+        identifierElements.forEach(el => {
+          const identifier = el.dataset.identifier;
+          if (identifier) {
+            identifiers.push(identifier);
           }
-        }
-
-        // When we think we have all identifiers, resolve the promise
-        let finishTimer = null;
-        function resetFinishTimer() {
-          if (finishTimer) clearTimeout(finishTimer);
-          // If no new identifier arrives within 300 ms, assume we’re done
-          finishTimer = setTimeout(finish, 300);
-        }
-        function finish() {
-          clearTimeout(finishTimer);
-          window.removeEventListener("message", onMessage);
-          iframe.remove();
-          resolve(identifiers);
-        }
-
-        // Listen for messages
-        window.addEventListener("message", onMessage);
-
-        // Load‑error handling
-        iframe.onerror = () => {
-          window.removeEventListener("message", onMessage);
-          iframe.remove();
-          reject(new Error("Failed to load identifiers.html"));
-        };
-
-        // Once the iframe is ready, ask it for identifiers
-        iframe.onload = () => {
-          try {
-            iframe.contentWindow.postMessage({type: "requestIdentifiers"}, "*");
-            // In case identifiers.html streams them one‑by‑one, set an initial timeout
-            resetFinishTimer();
-          } catch (e) {
-            window.removeEventListener("message", onMessage);
-            iframe.remove();
-            reject(e);
-          }
-        };
-
-        document.body.appendChild(iframe);
-      });
+        });
+        
+        return identifiers;
+      } catch (error) {
+        console.error('Error fetching identifiers:', error);
+        return [];
+      }
     }
-    // ----------------------------------------------------------------------
-
 
     // Function to create identifier items and store them
     async function createIdentifierItems() {
@@ -870,41 +813,33 @@
         grid.appendChild(itemData.element);
       });
 
-      // ----- REPLACED ARROW BLOCK -----
-      if (items.length > 0) {
+      // Add arrow button to the third card if there are more items
+      if (items.length > 0 && state.total > (state.page - 1) * 3) {
         const lastCard = newCards[newCards.length - 1].element;
+        const arrow = document.createElement("button");
+        arrow.className = "open-btn";
+        arrow.textContent = "➡️";
 
-        // any‑more‑items test
-        const moreItemsExist = state.total > (state.page - 1) * 3;
+        arrow.onclick = () => {
+          window.location.href =
+            `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
+        };
 
-        if (moreItemsExist) {
-          const arrow = document.createElement("button");
-          arrow.className = "open-btn";
-          arrow.textContent = "➡️";
-
-          arrow.onclick = () => {
-            window.location.href =
-              `item1.html?archive_profile_url=${encodeURIComponent(profileUrl)}`;
-          };
-
-          lastCard.querySelector(".card-actions").appendChild(arrow);
-
-          // 🔥 Insert identifiers ONLY when arrow exists
-          insertIdentifierItemsAfterCard(lastCard);
-        }
+        lastCard.querySelector(".card-actions").appendChild(arrow);
+        
+        // Insert 2 identifier items after the card with the arrow
+        insertIdentifierItemsAfterCard(lastCard);
       }
     }
 
     function insertIdentifierItemsAfterCard(card) {
       if (identifierItems.length === 0) return;
-
+      
+      // Take up to 2 identifier items
       const itemsToInsert = identifierItems.splice(0, 2);
-
-      let referenceNode = card;
-
+      
       itemsToInsert.forEach(itemData => {
-        referenceNode.after(itemData.element);
-        referenceNode = itemData.element; // chain insertion properly
+        card.after(itemData.element);
       });
     }
 
