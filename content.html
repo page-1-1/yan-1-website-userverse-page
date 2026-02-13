@@ -379,33 +379,6 @@
     const metadataCache = new Map();
     const thumbnailCache = new Map();
 
-    // Embed configuration function
-    function getEmbedConfig(identifier, mediatype) {
-      switch (mediatype) {
-        case "movies":
-        case "image":
-          return {
-            type: "iframe",
-            url: `https://archive.org/embed/${identifier}`
-          };
-
-        case "audio":
-          return {
-            type: "iframe",
-            url: `https://archive.org/details/${identifier}`
-          };
-
-        case "texts":
-          return {
-            type: "text",
-            url: null
-          };
-
-        default:
-          return null;
-      }
-    }
-
     // Get thumbnail URL
     function getThumbnailUrl(identifier) {
       return `https://archive.org/services/img/${identifier}`;
@@ -514,11 +487,6 @@
         `&fl[]=mediatype` +
         `&fl[]=description` +
         `&fl[]=subject` +
-        `&fl[]=gmail` +
-        `&fl[]=link1` +
-        `&fl[]=link2` +
-        `&fl[]=link3` +
-        `&fl[]=phone_number` +
         `&sort[]=publicdate desc` +
         `&rows=3` +
         `&page=${state.page}` +
@@ -589,12 +557,7 @@
             publicdate: data.metadata.publicdate || "N/A",
             mediatype: data.metadata.mediatype || "unknown",
             description: data.metadata.description || "No description",
-            subject: data.metadata.subject || [],
-            gmail: data.metadata.gmail,
-            link1: data.metadata.link1,
-            link2: data.metadata.link2,
-            link3: data.metadata.link3,
-            phone_number: data.metadata.phone_number
+            subject: data.metadata.subject || []
           };
           
           metadataCache.set(identifier, metadata);
@@ -626,11 +589,6 @@
       const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      const gmail = metadata.gmail;
-      const link1 = metadata.link1;
-      const link2 = metadata.link2;
-      const link3 = metadata.link3;
-      const phone_number = metadata.phone_number;
       const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
       
       // Modified: Add username=yanshun081 as the last parameter for identifiers
@@ -665,13 +623,6 @@
         <div class="meta"><b>Media:</b> ${mediaType}</div>
       `;
 
-      // Add optional fields only if they exist
-      if (gmail) metaHtml += `<div class="meta"><b>Gmail:</b> ${gmail}</div>`;
-      if (link1) metaHtml += `<div class="meta"><b>Link 1:</b> <a href="${link1}" target="_blank">${link1}</a></div>`;
-      if (link2) metaHtml += `<div class="meta"><b>Link 2:</b> <a href="${link2}" target="_blank">${link2}</a></div>`;
-      if (link3) metaHtml += `<div class="meta"><b>Link 3:</b> <a href="${link3}" target="_blank">${link3}</a></div>`;
-      if (phone_number) metaHtml += `<div class="meta"><b>Phone:</b> ${phone_number}</div>`;
-
       metaHtml += `
         <div class="description-full">${description}</div>
         <div class="meta">
@@ -685,26 +636,9 @@
 
       card.innerHTML = metaHtml;
 
-      card.querySelector(".open-btn").onclick = async () => {
-        const embed = getEmbedConfig(identifier, mediaType);
-
-        if (mediaType === "texts") {
-          const pdf = await getPdfFile(identifier);
-          if (pdf) {
-            openFullscreen(
-              `https://docs.google.com/gview?url=${encodeURIComponent(
-                `https://archive.org/download/${identifier}/${pdf}`
-              )}&embedded=true`
-            );
-            return;
-          }
-        }
-
-        if (embed && embed.url) {
-          openFullscreen(embed.url);
-        } else {
-          window.open(`https://archive.org/details/${identifier}`, "_blank");
-        }
+      card.querySelector(".open-btn").onclick = () => {
+        // Open direct page in iframe instead of embed
+        openFullscreen(`https://archive.org/details/${identifier}`);
       };
 
       card.querySelector(".share-btn").onclick = (e) => {
@@ -811,8 +745,8 @@
       }
     }
 
-    // Pick 2 random identifiers ensuring no duplicates
-    function pickRandomIdentifiers(count = 2) {
+    // Pick 3 random identifiers ensuring no duplicates
+    function pickRandomIdentifiers(count = 3) {
       if (identifierItems.length === 0) return [];
       
       const availableIdentifiers = identifierItems.filter(item => 
@@ -866,8 +800,8 @@
 
         lastCard.querySelector(".card-actions").appendChild(arrow);
         
-        // Insert 2 random identifier items after the card with the arrow
-        const randomIdentifiers = pickRandomIdentifiers(2);
+        // Insert 3 random identifier items after the card with the arrow
+        const randomIdentifiers = pickRandomIdentifiers(3);
         randomIdentifiers.forEach(itemData => {
           lastCard.after(itemData.element);
           loadedCount++;
@@ -940,7 +874,7 @@
     }
 
     // Fullscreen functionality
-    function openFullscreen(embedUrl) {
+    function openFullscreen(url) {
       // Create overlay
       const overlay = document.createElement("div");
       overlay.className = "fullscreen-overlay";
@@ -956,7 +890,7 @@
       // Create embed container
       const embedContainer = document.createElement("div");
       embedContainer.className = "embed-container";
-      embedContainer.innerHTML = `<iframe src="${embedUrl}" allowfullscreen></iframe>`;
+      embedContainer.innerHTML = `<iframe src="${url}" allowfullscreen></iframe>`;
       
       // Assemble and add to body
       overlay.appendChild(closeBtn);
