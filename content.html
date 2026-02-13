@@ -160,7 +160,6 @@
       text-decoration: underline;
     }
 
-    /* Fullscreen overlay styles */
     .fullscreen-overlay {
       position: fixed;
       top: 0;
@@ -734,6 +733,8 @@
       
       // Observe preview for lazy loading (will be ignored for thumbnail items)
       const preview = card.querySelector(".preview-container");
+      preview.dataset.identifier = identifier;      // <-- added
+      preview.dataset.mediatype = mediaType;       // <-- added
       previewObserver.observe(preview);
       
       // Get original files count and add files info
@@ -873,7 +874,8 @@
       if (items.length > 0) {
         const lastCard = newCards[newCards.length - 1].element;
 
-        const moreItemsExist = state.page * 3 <= state.total;
+        // any‑more‑items test
+        const moreItemsExist = state.total > (state.page - 1) * 3;
 
         if (moreItemsExist) {
           const arrow = document.createElement("button");
