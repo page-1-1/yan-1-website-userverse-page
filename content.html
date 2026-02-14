@@ -312,6 +312,32 @@
     .con-btn:hover {
       background: #334155;
     }
+    
+    .btn-container {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .action-btn {
+      padding: 0.8rem 1.5rem;
+      border-radius: 10px;
+      border: none;
+      background: #1e293b;
+      color: #e5e7eb;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .action-btn:hover {
+      background: #334155;
+    }
+    
+    .action-btn.active {
+      background: #38bdf8;
+      color: #020617;
+    }
   </style>
 </head>
 <body>
@@ -324,23 +350,29 @@
   
   <div class="subtitle" id="subtitle"></div>
 
+  <div class="btn-container">
+    <button id="profile-items-btn" class="action-btn">Profile Items</button>
+    <button id="yan-1-items-btn" class="action-btn">Yan_1 Items</button>
+  </div>
+
   <div class="grid-container">
     <div class="grid-section">
-      <h2>Profile Items & Identifiers</h2>
+      <h2 id="section-title">Profile Items</h2>
       <div class="grid" id="grid"></div>
     </div>
   </div>
 
   <button id="load-more" class="load-more-btn">Load More</button>
-  <button id="con-btn" class="con-btn">Content</button>
-  <div class="status" id="status">Click the button Load More or Content</div>
+  <div class="status" id="status">Select an option above to load content</div>
 
   <script>
     const grid = document.getElementById("grid");
     const status = document.getElementById("status");
     const subtitle = document.getElementById("subtitle");
     const loadMoreBtn = document.getElementById("load-more");
-    const conBtn = document.getElementById("con-btn");
+    const sectionTitle = document.getElementById("section-title");
+    const profileItemsBtn = document.getElementById("profile-items-btn");
+    const yan1ItemsBtn = document.getElementById("yan-1-items-btn");
 
     // Store all items for filtering
     let allItems = [];
@@ -355,6 +387,9 @@
     // Cache for metadata
     const metadataCache = new Map();
     const thumbnailCache = new Map();
+
+    // Current view state
+    let currentView = 'profile'; // 'profile' or 'yan1'
 
     // Get thumbnail URL
     function getThumbnailUrl(identifier) {
@@ -528,54 +563,95 @@
       return fallbackMetadata;
     }
 
-    // Create card with placeholder metadata
-    function createPlaceholderCard(identifier) {
+    function createCard(identifier, metadata, username = null, isIdentifierItem = false) {
+      const title = metadata.title || identifier;
+      const creator = metadata.creator || "Unknown";
+      const date = metadata.publicdate || "N/A";
+      const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
+      const mediaType = metadata.mediatype || "unknown";
+      const description = metadata.description ? metadata.description.toString() : "No description";
+      // Removed reviewsUrl since we're removing the reviews option
+      
+      // Modified: Add username=yanshun081 as the last parameter for identifiers
+      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
+        (username ? `&username=${username}` : `&username=yanshun081`);
+
       const card = document.createElement("div");
       card.className = "card";
-      card.dataset.identifier = identifier;
-      card.dataset.isIdentifier = "true";
+      card.dataset.mediatype = mediaType;
+      if (isIdentifierItem) {
+        card.dataset.isIdentifier = "true";
+      }
 
       let metaHtml = `
-        <div class="title">${identifier}</div>
+        <div class="title">${title}</div>
         <div class="preview-container"
              data-identifier="${identifier}"
-             data-mediatype="unknown">
+             data-mediatype="${mediaType}">
           <div class="preview-placeholder">Loading thumbnail…</div>
         </div>
-        <div class="meta"><b>Creator:</b> Unknown</div>
-        <div class="meta"><b>Date:</b> N/A</div>
-        <div class="meta"><b>Tags:</b> None</div>
-        <div class="meta"><b>Media:</b> unknown</div>
-        <div class="description-full">Loading description...</div>
+        <div class="meta"><b>Creator:</b> ${creator}</div>
+      `;
+
+      // Only show username if provided (for profile items)
+      if (username) {
+        metaHtml += `<div class="username-meta"><b>Username:</b> @${username}</div>`;
+      }
+
+      metaHtml += `
+        <div class="meta"><b>Date:</b> ${date}</div>
+        <div class="meta"><b>Tags:</b> ${tags}</div>
+        <div class="meta"><b>Media:</b> ${mediaType}</div>
+      `;
+
+      metaHtml += `
+        <div class="description-full">${description}</div>
         <div class="card-actions">
           <button class="open-btn">Open Item</button>
-          <button class="share-btn" data-share-url="https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}&username=yanshun081">ᯓ➤</button>
+          <button class="share-btn" data-share-url="${shareUrl}">ᯓ➤</button>
         </div>
       `;
 
       card.innerHTML = metaHtml;
 
+      card.querySelector(".open-btn").onclick = () => {
+        // Open direct page in iframe instead of embed
+        openFullscreen(`https://archive.org/details/${identifier}`);
+      };
+
+      card.querySelector(".share-btn").onclick = (e) => {
+        const shareUrl = e.target.dataset.shareUrl;
+        // Check if Web Share API is available
+        if (navigator.share) {
+          navigator.share({
+            title: title,
+            url: shareUrl
+          }).catch(console.error);
+        } else {
+          // Fallback to clipboard
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            alert("Share link copied to clipboard!");
+          }).catch(err => {
+            console.error('Failed to copy: ', err);
+            // Fallback prompt
+            prompt("Copy this link to share:", shareUrl);
+          });
+        }
+      };
+
+      // Store item for filtering
+      const itemData = {
+        element: card,
+        mediatype: mediaType,
+        isIdentifier: isIdentifierItem
+      };
+      allItems.push(itemData);
+      
       // Observe thumbnail for lazy loading
       const preview = card.querySelector(".preview-container");
       thumbnailObserver.observe(preview);
       
-      return card;
-    }
-
-    function updateCardWithMetadata(card, metadata) {
-      const titleEl = card.querySelector('.title');
-      const creatorEl = card.querySelector('.meta:nth-child(3)');
-      const dateEl = card.querySelector('.meta:nth-child(4)');
-      const tagsEl = card.querySelector('.meta:nth-child(5)');
-      const mediaEl = card.querySelector('.meta:nth-child(6)');
-      const descEl = card.querySelector('.description-full');
-
-      if (titleEl) titleEl.textContent = metadata.title || metadata.identifier;
-      if (creatorEl) creatorEl.innerHTML = `<b>Creator:</b> ${metadata.creator || "Unknown"}`;
-      if (dateEl) dateEl.innerHTML = `<b>Date:</b> ${metadata.publicdate || "N/A"}`;
-      if (tagsEl) tagsEl.innerHTML = `<b>Tags:</b> ${metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None"}`;
-      if (mediaEl) mediaEl.innerHTML = `<b>Media:</b> ${metadata.mediatype || "unknown"}`;
-      if (descEl) descEl.textContent = metadata.description ? metadata.description.toString() : "No description";
+      return itemData;
     }
 
     // Function to fetch identifiers from identifiers.json
@@ -590,8 +666,8 @@
       }
     }
 
-    // Function to create identifier items and store them (without metadata)
-    async function createIdentifierPlaceholders() {
+    // Function to create identifier items and store them
+    async function createIdentifierItems() {
       const identifiers = await fetchIdentifiers();
       
       if (identifiers.length === 0) {
@@ -602,14 +678,15 @@
       // Combine identifiers from identifiers.json with API identifiers
       allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
       
-      // Create placeholder cards for all identifiers
+      // Create identifier items and store them
       for (const identifier of allIdentifiers) {
-        const card = createPlaceholderCard(identifier);
-        identifierItems.push({
-          element: card,
-          identifier: identifier,
-          metadataLoaded: false
-        });
+        try {
+          const metadata = await fetchIdentifierMetadata(identifier);
+          const itemData = createCard(identifier, metadata, null, true);
+          identifierItems.push(itemData);
+        } catch (error) {
+          console.error(`Failed to create identifier item for ${identifier}:`, error);
+        }
       }
     }
 
@@ -624,19 +701,6 @@
       }
       
       return selected;
-    }
-
-    // Load metadata for a specific identifier card
-    async function loadIdentifierMetadata(itemData) {
-      if (itemData.metadataLoaded) return;
-      
-      try {
-        const metadata = await fetchIdentifierMetadata(itemData.identifier);
-        updateCardWithMetadata(itemData.element, metadata);
-        itemData.metadataLoaded = true;
-      } catch (error) {
-        console.error(`Failed to load metadata for ${itemData.identifier}:`, error);
-      }
     }
 
     function renderAccountItems(profileUrl, result) {
@@ -654,18 +718,6 @@
         loadedCount++;
       });
 
-      // Insert next 3 identifiers from identifiers.json (placeholders)
-      const nextIdentifiers = getNextIdentifiers(items.length);
-      nextIdentifiers.forEach((itemData, index) => {
-        if (newCards[index]) {
-          newCards[index].element.after(itemData.element);
-          loadedCount++;
-          
-          // Load metadata for this identifier now that it's displayed
-          loadIdentifierMetadata(itemData);
-        }
-      });
-      
       // Show load more button if we've loaded initial batch
       if (loadedCount >= ITEMS_PER_LOAD) {
         loadMoreBtn.classList.remove("hidden");
@@ -677,51 +729,11 @@
       return profileUrls.every(url => accountState[url].exhausted);
     }
 
-    // Display remaining identifiers from identifiers.json
-    function displayRemainingIdentifiers() {
-      const remainingCount = identifierItems.length - identifierIndex;
-      if (remainingCount <= 0) {
-        status.textContent = "No more items to load.";
-        return;
-      }
-
-      status.textContent = `Loading ${Math.min(9, remainingCount)} remaining identifiers...`;
-      
-      // Load up to 9 remaining identifiers
-      const batchSize = Math.min(9, remainingCount);
-      for (let i = 0; i < batchSize; i++) {
-        if (identifierIndex < identifierItems.length) {
-          const itemData = identifierItems[identifierIndex];
-          grid.appendChild(itemData.element);
-          identifierIndex++;
-          loadedCount++;
-          
-          // Load metadata for this identifier now that it's displayed
-          loadIdentifierMetadata(itemData);
-        }
-      }
-      
-      status.textContent = "";
-      
-      // Hide load more button if no more identifiers
-      if (identifierIndex >= identifierItems.length) {
-        loadMoreBtn.classList.add("hidden");
-        status.textContent = "All items loaded.";
-      }
-    }
-
-    // Load more items function
-    async function loadMoreItems() {
-      status.textContent = "Loading more content…";
+    // Load more items function for profile items
+    async function loadMoreProfileItems() {
+      status.textContent = "Loading more profile items…";
       loadMoreBtn.disabled = true;
       
-      // If all accounts are exhausted, display remaining identifiers
-      if (areAllAccountsExhausted()) {
-        displayRemainingIdentifiers();
-        loadMoreBtn.disabled = false;
-        return;
-      }
-
       let loadedInThisBatch = 0;
       
       // Load profile items
@@ -742,38 +754,71 @@
       loadMoreBtn.disabled = false;
     }
 
-    // Con button functionality - display next identifiers
-    function loadNextIdentifiers() {
-      status.textContent = "Loading identifiers...";
+    // Load Yan_1 items function
+    async function loadYan1Items() {
+      status.textContent = "Loading Yan_1 items...";
       
-      // Get next 3 identifiers
-      const nextIdentifiers = getNextIdentifiers(3);
-      
-      if (nextIdentifiers.length === 0) {
-        status.textContent = "No more identifiers to load.";
-        return;
+      // Fetch identifiers if not already fetched
+      if (allIdentifiers.length === 0) {
+        await createIdentifierItems();
       }
       
-      // Append to grid
-      nextIdentifiers.forEach(itemData => {
-        grid.appendChild(itemData.element);
-        loadedCount++;
-        
-        // Load metadata for this identifier now that it's displayed
-        loadIdentifierMetadata(itemData);
-      });
+      // Get 5 random identifiers
+      const shuffled = [...allIdentifiers].sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, 5);
+      
+      // Fetch metadata for these identifiers
+      for (const identifier of selected) {
+        try {
+          const metadata = await fetchIdentifierMetadata(identifier);
+          const itemData = createCard(identifier, metadata, null, true);
+          grid.appendChild(itemData.element);
+          loadedCount++;
+        } catch (error) {
+          console.error(`Failed to load Yan_1 item for ${identifier}:`, error);
+        }
+      }
       
       status.textContent = "";
     }
 
-    async function initialLoad() {
-      // Start loading identifiers in background (no await)
-      await createIdentifierPlaceholders();
+    // Clear grid and reset state
+    function clearGrid() {
+      grid.innerHTML = '';
+      allItems = [];
+      loadedCount = 0;
+      identifierIndex = 0;
+    }
+
+    // Switch to profile items view
+    function showProfileItems() {
+      currentView = 'profile';
+      clearGrid();
+      sectionTitle.textContent = "Profile Items";
+      loadMoreBtn.classList.remove("hidden");
+      profileItemsBtn.classList.add("active");
+      yan1ItemsBtn.classList.remove("active");
       
-      status.textContent = "Click the button Load More or Content";
-      
-      // Hide load more button initially
+      // Load initial profile items
+      loadMoreProfileItems();
+    }
+
+    // Switch to Yan_1 items view
+    function showYan1Items() {
+      currentView = 'yan1';
+      clearGrid();
+      sectionTitle.textContent = "Yan_1 Items";
       loadMoreBtn.classList.add("hidden");
+      yan1ItemsBtn.classList.add("active");
+      profileItemsBtn.classList.remove("active");
+      
+      // Load Yan_1 items
+      loadYan1Items();
+    }
+
+    async function initialLoad() {
+      // Initially show profile items
+      showProfileItems();
     }
 
     // Fullscreen functionality
@@ -802,8 +847,14 @@
     }
 
     // Event listeners
-    loadMoreBtn.addEventListener("click", loadMoreItems);
-    conBtn.addEventListener("click", loadNextIdentifiers);
+    loadMoreBtn.addEventListener("click", () => {
+      if (currentView === 'profile') {
+        loadMoreProfileItems();
+      }
+    });
+    
+    profileItemsBtn.addEventListener("click", showProfileItems);
+    yan1ItemsBtn.addEventListener("click", showYan1Items);
 
     // Initialize
     initialLoad().catch(err => {
