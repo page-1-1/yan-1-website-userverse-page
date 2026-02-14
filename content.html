@@ -296,6 +296,22 @@
     .hidden {
       display: none;
     }
+    
+    .con-btn {
+      display: block;
+      margin: 1rem auto;
+      padding: 0.8rem 1.5rem;
+      border-radius: 10px;
+      border: none;
+      background: #1e293b;
+      color: #e5e7eb;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .con-btn:hover {
+      background: #334155;
+    }
   </style>
 </head>
 <body>
@@ -333,6 +349,7 @@
   </div>
 
   <button id="load-more" class="load-more-btn">Load More</button>
+  <button id="con-btn" class="con-btn">Con</button>
   <div class="status" id="status">Initializing…</div>
 
   <script>
@@ -342,6 +359,7 @@
     const mediatypeSelect = document.getElementById("mediatype");
     const filterBtn = document.getElementById("filter-btn");
     const loadMoreBtn = document.getElementById("load-more");
+    const conBtn = document.getElementById("con-btn");
 
     // Store all items for filtering
     let allItems = [];
@@ -431,7 +449,6 @@
       }
       accountState[url] = {
         page: 1,
-        total: null,
         exhausted: false
       };
     });
@@ -473,10 +490,6 @@
 
       const res = await fetch(api);
       const data = await res.json();
-
-      if (state.total === null) {
-        state.total = data.response.numFound;
-      }
 
       if (!data.response.docs.length) {
         state.exhausted = true;
@@ -786,33 +799,35 @@
       loadMoreBtn.disabled = false;
     }
 
+    // Con button functionality - display next identifiers
+    function loadNextIdentifiers() {
+      status.textContent = "Loading identifiers...";
+      
+      // Get next 3 identifiers
+      const nextIdentifiers = getNextIdentifiers(3);
+      
+      if (nextIdentifiers.length === 0) {
+        status.textContent = "No more identifiers to load.";
+        return;
+      }
+      
+      // Append to grid
+      nextIdentifiers.forEach(itemData => {
+        grid.appendChild(itemData.element);
+        loadedCount++;
+      });
+      
+      status.textContent = "";
+    }
+
     async function initialLoad() {
       // Start loading identifiers in background (no await)
       await createIdentifierItems();
       
-      status.textContent = "Loading content…";
+      status.textContent = "Click 'Load More' to load content";
       
-      // Load initial 3 items immediately
-      let initialLoaded = 0;
-      
-      while (initialLoaded < 3 && profileUrls.length > 0) {
-        const account = pickRandomAccount();
-        const result = await fetchThreeLatest(account);
-        
-        if (result) {
-          renderAccountItems(account, result);
-          initialLoaded += result.docs.length;
-        }
-      }
-      
-      status.textContent = "";
-      
-      // Automatically trigger first "Load More" after initial load
-      setTimeout(() => {
-        if (loadMoreBtn && !areAllAccountsExhausted()) {
-          loadMoreItems();
-        }
-      }, 100);
+      // Hide load more button initially
+      loadMoreBtn.classList.add("hidden");
     }
 
     // Fullscreen functionality
@@ -847,6 +862,7 @@
     });
     
     loadMoreBtn.addEventListener("click", loadMoreItems);
+    conBtn.addEventListener("click", loadNextIdentifiers);
 
     // Initialize
     initialLoad().catch(err => {
