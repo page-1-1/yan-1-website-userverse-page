@@ -342,15 +342,14 @@
     const loadMoreBtn = document.getElementById("load-more");
     const conBtn = document.getElementById("con-btn");
 
+    // Store identifiers ONLY (no cards, no metadata)
+    let identifiers = [];
+    const IDENTIFIERS_PER_CLICK = 5;
+
     // Store all items for filtering
     let allItems = [];
     let loadedCount = 0;
     const ITEMS_PER_LOAD = 9;
-    
-    // Store identifiers for later insertion
-    let identifierItems = [];
-    let allIdentifiers = []; // Combined list of identifiers
-    let identifierIndex = 0; // Track which identifiers we've used
     
     // Cache for metadata
     const metadataCache = new Map();
@@ -393,6 +392,20 @@
       threshold: 0.1
     });
 
+    // Load identifiers list only
+    async function loadIdentifiersList() {
+      try {
+        const response = await fetch('identifiers.json');
+        identifiers = await response.json();
+        if (!Array.isArray(identifiers)) {
+          identifiers = [];
+        }
+      } catch (error) {
+        console.error('Error loading identifiers:', error);
+        identifiers = [];
+      }
+    }
+
     const stored = localStorage.getItem("archive_profile_urls");
     if (!stored) {
       status.textContent = "No archive data found.";
@@ -433,19 +446,26 @@
       };
     });
 
-    function pickRandomAccount() {
+    function pickRandomAccounts(count) {
       const available = profileUrls.filter(
         u => !usedThisRound.has(u) && !accountState[u].exhausted
       );
 
-      if (!available.length) {
+      if (available.length < count) {
         usedThisRound.clear(); // start next round
-        return pickRandomAccount();
+        return pickRandomAccounts(count);
       }
 
-      const pick = available[Math.floor(Math.random() * available.length)];
-      usedThisRound.add(pick);
-      return pick;
+      // Shuffle available accounts and pick first 'count' items
+      const shuffled = available
+        .map(a => ({ a, r: Math.random() }))
+        .sort((x, y) => x.r - y.r)
+        .map(o => o.a);
+      
+      const picked = shuffled.slice(0, count);
+      picked.forEach(acc => usedThisRound.add(acc));
+      
+      return picked;
     }
 
     async function fetchThreeLatest(profileUrl) {
@@ -484,7 +504,7 @@
       };
     }
 
-    // Fetch metadata using Archive.org metadata API with caching
+    // Fetch metadata on-demand
     async function fetchIdentifierMetadata(identifier) {
       if (metadataCache.has(identifier)) {
         return metadataCache.get(identifier);
@@ -535,7 +555,6 @@
       const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      // Removed reviewsUrl since we're removing the reviews option
       
       // Modified: Add username=yanshun081 as the last parameter for identifiers
       const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
@@ -619,82 +638,99 @@
       return itemData;
     }
 
-    // Function to fetch identifiers from identifiers.json
-    async function fetchIdentifiers() {
-      try {
-        const response = await fetch('identifiers.json');
-        const identifiers = await response.json();
-        return Array.isArray(identifiers) ? identifiers : [];
-      } catch (error) {
-        console.error('Error fetching identifiers:', error);
+    // Get random identifiers (no sequential logic)
+    function getRandomIdentifiers(count) {
+      if (identifiers.length === 0) return [];
+      
+      // Shuffle identifiers and pick random ones
+      const shuffled = [...identifiers]
+        .map(value => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value);
+      
+      return shuffled.slice(0, Math.min(count, shuffled.length));
+    }
+
+    // Load random identifiers on-demand
+    async function loadRandomIdentifiers(count = IDENTIFIERS_PER_CLICK) {
+      const randomIdentifiers = getRandomIdentifiers(count);
+      
+      if (randomIdentifiers.length === 0) {
         return [];
       }
-    }
 
-    // Function to create identifier items and store them
-    async function createIdentifierItems() {
-      const identifiers = await fetchIdentifiers();
-      
-      if (identifiers.length === 0) {
-        console.log('No identifiers found');
-        return;
-      }
-      
-      // Combine identifiers from identifiers.json with API identifiers
-      allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
-      
-      // Create identifier items and store them
-      for (const identifier of allIdentifiers) {
-        try {
-          const metadata = await fetchIdentifierMetadata(identifier);
-          const itemData = createCard(identifier, metadata, null, true);
-          identifierItems.push(itemData);
-        } catch (error) {
-          console.error(`Failed to create identifier item for ${identifier}:`, error);
+      // Parallel metadata fetch
+      const metadatas = await Promise.all(
+        randomIdentifiers.map(id => fetchIdentifierMetadata(id))
+      );
+
+      const items = [];
+      metadatas.forEach(meta => {
+        if (meta) {
+          const item = createCard(meta.identifier, meta, null, true);
+          items.push(item);
         }
-      }
-    }
-
-    // Pick next 3 identifiers sequentially
-    function getNextIdentifiers(count = 3) {
-      if (identifierItems.length === 0) return [];
-      
-      const selected = [];
-      for (let i = 0; i < count && identifierIndex < identifierItems.length; i++) {
-        selected.push(identifierItems[identifierIndex]);
-        identifierIndex++;
-      }
-      
-      return selected;
-    }
-
-    function renderAccountItems(profileUrl, result) {
-      const state = accountState[profileUrl];
-      const items = result.docs;
-      const username = result.username;
-      
-      // Create cards for all items
-      const newCards = [];
-      items.forEach((meta, index) => {
-        const identifier = meta.identifier;
-        const itemData = createCard(identifier, meta, username, false);
-        newCards.push(itemData);
-        grid.appendChild(itemData.element);
-        loadedCount++;
       });
 
-      // Insert next 3 identifiers from identifiers.json
-      const nextIdentifiers = getNextIdentifiers(items.length);
-      nextIdentifiers.forEach((itemData, index) => {
-        if (newCards[index]) {
-          newCards[index].element.after(itemData.element);
+      return items;
+    }
+
+    // ✅ Unified load function for both buttons
+    async function loadAllContent() {
+      status.textContent = "Loading content…";
+      loadMoreBtn.disabled = true;
+      conBtn.disabled = true;
+
+      try {
+        // Load 5 random identifiers in parallel
+        const identifierItems = await loadRandomIdentifiers(5);
+        identifierItems.forEach(item => {
+          grid.appendChild(item.element);
           loadedCount++;
+        });
+
+        // Choose 2 random accounts and fetch sequentially but display parallelly
+        const randomAccounts = pickRandomAccounts(2);
+        
+        const accountPromises = randomAccounts.map(async (accountUrl) => {
+          try {
+            const result = await fetchThreeLatest(accountUrl);
+            if (result) {
+              const state = accountState[accountUrl];
+              const items = result.docs;
+              const username = result.username;
+              
+              // Create cards for all items from this account
+              items.forEach((meta) => {
+                const identifier = meta.identifier;
+                const itemData = createCard(identifier, meta, username, false);
+                grid.appendChild(item.element);
+                loadedCount++;
+              });
+            }
+          } catch (error) {
+            console.error(`Error fetching from account ${accountUrl}:`, error);
+          }
+        });
+
+        // Execute account requests sequentially but display results as they arrive
+        for (const promise of accountPromises) {
+          await promise;
         }
-      });
-      
-      // Show load more button if we've loaded initial batch
-      if (loadedCount >= ITEMS_PER_LOAD) {
-        loadMoreBtn.classList.remove("hidden");
+
+        // Show load more button if we've loaded initial batch
+        if (loadedCount >= ITEMS_PER_LOAD) {
+          loadMoreBtn.classList.remove("hidden");
+        }
+
+        status.textContent = "";
+        
+      } catch (error) {
+        console.error('Error loading content:', error);
+        status.textContent = "Error loading content.";
+      } finally {
+        loadMoreBtn.disabled = false;
+        conBtn.disabled = false;
       }
     }
 
@@ -703,92 +739,10 @@
       return profileUrls.every(url => accountState[url].exhausted);
     }
 
-    // Display remaining identifiers from identifiers.json
-    function displayRemainingIdentifiers() {
-      const remainingCount = identifierItems.length - identifierIndex;
-      if (remainingCount <= 0) {
-        status.textContent = "No more items to load.";
-        return;
-      }
-
-      status.textContent = `Loading ${Math.min(9, remainingCount)} remaining identifiers...`;
-      
-      // Load up to 9 remaining identifiers
-      const batchSize = Math.min(9, remainingCount);
-      for (let i = 0; i < batchSize; i++) {
-        if (identifierIndex < identifierItems.length) {
-          grid.appendChild(identifierItems[identifierIndex].element);
-          identifierIndex++;
-          loadedCount++;
-        }
-      }
-      
-      status.textContent = "";
-      
-      // Hide load more button if no more identifiers
-      if (identifierIndex >= identifierItems.length) {
-        loadMoreBtn.classList.add("hidden");
-        status.textContent = "All items loaded.";
-      }
-    }
-
-    // Load more items function
-    async function loadMoreItems() {
-      status.textContent = "Loading more content…";
-      loadMoreBtn.disabled = true;
-      
-      // If all accounts are exhausted, display remaining identifiers
-      if (areAllAccountsExhausted()) {
-        displayRemainingIdentifiers();
-        loadMoreBtn.disabled = false;
-        return;
-      }
-
-      let loadedInThisBatch = 0;
-      
-      // Load profile items
-      while (loadedInThisBatch < 3) {
-        const account = pickRandomAccount();
-        const result = await fetchThreeLatest(account);
-        
-        if (result) {
-          renderAccountItems(account, result);
-          loadedInThisBatch += result.docs.length;
-        }
-        
-        // Small delay to prevent overwhelming the API
-        await new Promise(r => setTimeout(r, 100));
-      }
-      
-      status.textContent = "";
-      loadMoreBtn.disabled = false;
-    }
-
-    // Con button functionality - display next identifiers
-    function loadNextIdentifiers() {
-      status.textContent = "Loading identifiers...";
-      
-      // Get next 3 identifiers
-      const nextIdentifiers = getNextIdentifiers(3);
-      
-      if (nextIdentifiers.length === 0) {
-        status.textContent = "No more identifiers to load.";
-        return;
-      }
-      
-      // Append to grid
-      nextIdentifiers.forEach(itemData => {
-        grid.appendChild(itemData.element);
-        loadedCount++;
-      });
-      
-      status.textContent = "";
-    }
-
+    // Initial load becomes lightweight
     async function initialLoad() {
-      // Start loading identifiers in background (no await)
-      await createIdentifierItems();
-      
+      // Load identifiers list only
+      await loadIdentifiersList();
       status.textContent = "Click the button Load More or Content";
       
       // Hide load more button initially
@@ -820,11 +774,11 @@
       document.body.appendChild(overlay);
     }
 
-    // Event listeners
-    loadMoreBtn.addEventListener("click", loadMoreItems);
-    conBtn.addEventListener("click", loadNextIdentifiers);
+    // Event listeners - both buttons do the same thing now
+    loadMoreBtn.addEventListener("click", loadAllContent);
+    conBtn.addEventListener("click", loadAllContent);
 
-    // Initialize
+    // Initialize - lightweight initial load
     initialLoad().catch(err => {
       console.error(err);
       status.textContent = "Error while loading content.";
