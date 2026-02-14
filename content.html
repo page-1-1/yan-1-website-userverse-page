@@ -809,7 +809,7 @@
       
       // Automatically trigger first "Load More" after initial load
       setTimeout(() => {
-        if (!areAllAccountsExhausted()) {
+        if (loadMoreBtn && !areAllAccountsExhausted()) {
           loadMoreItems();
         }
       }, 100);
