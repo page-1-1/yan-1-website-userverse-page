@@ -322,23 +322,6 @@
   </h1>
   <div class="description">A place to learn, enjoy, feel, express—while knowing others and being active together.</div>
   
-  <div class="media-type-selector">
-    <label for="mediatype">Media Type:</label>
-    <select id="mediatype">
-      <option value="all">All Types</option>
-      <option value="texts">Texts</option>
-      <option value="movies">Movies</option>
-      <option value="audio">Audio</option>
-      <option value="software">Software</option>
-      <option value="image">Images</option>
-      <option value="data">Data</option>
-      <option value="web">Web</option>
-      <option value="collection">Collections</option>
-      <option value="account">Accounts</option>
-    </select>
-    <button id="filter-btn">OK</button>
-  </div>
-
   <div class="subtitle" id="subtitle"></div>
 
   <div class="grid-container">
@@ -349,21 +332,18 @@
   </div>
 
   <button id="load-more" class="load-more-btn">Load More</button>
-  <button id="con-btn" class="con-btn">Con</button>
-  <div class="status" id="status">Initializing…</div>
+  <button id="con-btn" class="con-btn">Content</button>
+  <div class="status" id="status">Click the button Load More or Content</div>
 
   <script>
     const grid = document.getElementById("grid");
     const status = document.getElementById("status");
     const subtitle = document.getElementById("subtitle");
-    const mediatypeSelect = document.getElementById("mediatype");
-    const filterBtn = document.getElementById("filter-btn");
     const loadMoreBtn = document.getElementById("load-more");
     const conBtn = document.getElementById("con-btn");
 
     // Store all items for filtering
     let allItems = [];
-    let currentFilter = "all";
     let loadedCount = 0;
     const ITEMS_PER_LOAD = 9;
     
@@ -721,18 +701,6 @@
       }
     }
 
-    function filterItems() {
-      const filterValue = currentFilter;
-      
-      allItems.forEach(item => {
-        if (filterValue === "all" || item.mediatype === filterValue) {
-          item.element.style.display = "flex";
-        } else {
-          item.element.style.display = "none";
-        }
-      });
-    }
-
     // Check if all accounts have been exhausted
     function areAllAccountsExhausted() {
       return profileUrls.every(url => accountState[url].exhausted);
@@ -824,7 +792,7 @@
       // Start loading identifiers in background (no await)
       await createIdentifierItems();
       
-      status.textContent = "Click 'Load More' to load content";
+      status.textContent = "Click the button Load More or Content";
       
       // Hide load more button initially
       loadMoreBtn.classList.add("hidden");
@@ -856,11 +824,6 @@
     }
 
     // Event listeners
-    filterBtn.addEventListener("click", () => {
-      currentFilter = mediatypeSelect.value;
-      filterItems();
-    });
-    
     loadMoreBtn.addEventListener("click", loadMoreItems);
     conBtn.addEventListener("click", loadNextIdentifiers);
 
