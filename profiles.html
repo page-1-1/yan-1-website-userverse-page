@@ -323,7 +323,7 @@ function shareProfile(username) {
 
 function renderProfiles(profiles) {
   profiles.forEach(profile => {
-    const { url, username, avatarSrc, avatar1, avatar2 } = profile;
+    const { url, username, avatarSrc } = profile;
     
     const card = document.createElement("div");
     card.className = "card";
@@ -331,11 +331,7 @@ function renderProfiles(profiles) {
     const img = document.createElement("img");
     img.className = "avatar";
     img.loading = "lazy"; // Native lazy loading
-    img.src = avatar1;
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = avatar2;
-    };
+    img.src = avatarSrc;
     img.onerror = () => {
       img.src = "https://archive.org/images/glogo.png";
     };
@@ -387,16 +383,13 @@ if (stored) {
     const match = url.match(/@([^/]+)/);
     const username = match ? match[1] : "unknown";
 
-    const avatar1 = `https://archive.org/services/img/@${username}`;
-    const avatar2 = `https://archive.org/services/img/@${username}/uploads`;
+    const avatarSrc = `https://archive.org/services/img/@${username}`;
     const fallback = "https://archive.org/images/glogo.png";
     
     return { 
       url, 
       username, 
-      avatarSrc: avatar1,
-      avatar1,
-      avatar2,
+      avatarSrc,
       fallback
     };
   });
