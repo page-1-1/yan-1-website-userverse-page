@@ -720,11 +720,52 @@
       });
     }
 
+    // Check if all accounts have been exhausted
+    function areAllAccountsExhausted() {
+      return profileUrls.every(url => accountState[url].exhausted);
+    }
+
+    // Display remaining identifiers from identifiers.json
+    function displayRemainingIdentifiers() {
+      const remainingCount = identifierItems.length - identifierIndex;
+      if (remainingCount <= 0) {
+        status.textContent = "No more items to load.";
+        return;
+      }
+
+      status.textContent = `Loading ${Math.min(9, remainingCount)} remaining identifiers...`;
+      
+      // Load up to 9 remaining identifiers
+      const batchSize = Math.min(9, remainingCount);
+      for (let i = 0; i < batchSize; i++) {
+        if (identifierIndex < identifierItems.length) {
+          grid.appendChild(identifierItems[identifierIndex].element);
+          identifierIndex++;
+          loadedCount++;
+        }
+      }
+      
+      status.textContent = "";
+      
+      // Hide load more button if no more identifiers
+      if (identifierIndex >= identifierItems.length) {
+        loadMoreBtn.classList.add("hidden");
+        status.textContent = "All items loaded.";
+      }
+    }
+
     // Load more items function
     async function loadMoreItems() {
       status.textContent = "Loading more content…";
       loadMoreBtn.disabled = true;
       
+      // If all accounts are exhausted, display remaining identifiers
+      if (areAllAccountsExhausted()) {
+        displayRemainingIdentifiers();
+        loadMoreBtn.disabled = false;
+        return;
+      }
+
       let loadedInThisBatch = 0;
       
       // Load profile items
@@ -765,6 +806,13 @@
       }
       
       status.textContent = "";
+      
+      // Automatically trigger first "Load More" after initial load
+      setTimeout(() => {
+        if (!areAllAccountsExhausted()) {
+          loadMoreItems();
+        }
+      }, 100);
     }
 
     // Fullscreen functionality
