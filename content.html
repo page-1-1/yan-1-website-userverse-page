@@ -535,7 +535,7 @@
       const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
+      // Removed reviewsUrl since we're removing the reviews option
       
       // Modified: Add username=yanshun081 as the last parameter for identifiers
       const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
@@ -571,9 +571,6 @@
 
       metaHtml += `
         <div class="description-full">${description}</div>
-        <div class="meta">
-          <a href="${reviewUrl}" target="_blank" class="reviews-link">Reviews</a>
-        </div>
         <div class="card-actions">
           <button class="open-btn">Open Item</button>
           <button class="share-btn" data-share-url="${shareUrl}">ᯓ➤</button>
