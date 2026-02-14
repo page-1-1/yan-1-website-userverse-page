@@ -247,14 +247,14 @@
       color: #93c5fd;
     }
     
-    .preview-container {
+    .thumbnail-container {
       height: 150px;
       margin: 5px 0;
       border-radius: 8px;
       overflow: hidden;
     }
     
-    .preview-placeholder {
+    .thumbnail-placeholder {
       height: 100%;
       background: #020617;
       display: flex;
@@ -264,10 +264,10 @@
       font-size: 0.8rem;
     }
     
-    .preview-container iframe {
+    .thumbnail-container img {
       width: 100%;
       height: 100%;
-      border: none;
+      object-fit: cover;
     }
     
     .card-actions {
@@ -371,26 +371,6 @@
     let allItems = [];
     let displayedItems = [];
 
-    // IntersectionObserver for lazy loading previews
-    const previewObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-
-        const container = entry.target;
-        const embedUrl = container.dataset.embed;
-        if (!embedUrl) return;
-
-        container.innerHTML = `
-          <iframe src="${embedUrl}" loading="lazy"></iframe>
-        `;
-
-        previewObserver.unobserve(container);
-      });
-    }, {
-      rootMargin: "200px",
-      threshold: 0.1
-    });
-
     // Get profile URL from query parameter
     const urlParams = new URLSearchParams(window.location.search);
     const profileUrl = urlParams.get('archive_profile_url');
@@ -490,11 +470,6 @@
         `&fl[]=mediatype` +
         `&fl[]=description` +
         `&fl[]=subject` +
-        `&fl[]=gmail` +  // Changed from email to gmail
-        `&fl[]=phone_number` +
-        `&fl[]=link1` +
-        `&fl[]=link2` +
-        `&fl[]=link3` +
         `&sort[]=publicdate desc` +
         `&rows=50` +
         `&page=${page}` +
@@ -575,15 +550,9 @@
       const tags = metadata.subject ? metadata.subject.toString() : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      const email = metadata.gmail || "";  // Changed from email to gmail
-      const phoneNumber = metadata.phone_number || "";
-      const link1 = metadata.link1 || "";
-      const link2 = metadata.link2 || "";
-      const link3 = metadata.link3 || "";
       
-      const reviewUrl = `https://archive.org/details/${identifier}#reviews`;
-      const embedUrl = `https://archive.org/embed/${identifier}`;
       const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?username=${username}&identifier=${identifier}`;
+      const thumbnailUrl = `https://archive.org/services/img/${identifier}`;
 
       const card = document.createElement("div");
       card.className = "card";
@@ -592,42 +561,26 @@
       card.dataset.title = title.toLowerCase();
       card.dataset.tags = tags.toLowerCase();
 
-      // Build contact info section
-      let contactInfoHTML = '';
-      if (email || phoneNumber || link1 || link2 || link3) {
-        contactInfoHTML = '<div class="meta"><b>Contact Info:</b><br>';
-        if (email) contactInfoHTML += `📧 ${email}<br>`;
-        if (phoneNumber) contactInfoHTML += `📞 ${phoneNumber}<br>`;
-        if (link1) contactInfoHTML += `<a href="${link1}" target="_blank" class="contact-link">🔗 Link 1</a><br>`;
-        if (link2) contactInfoHTML += `<a href="${link2}" target="_blank" class="contact-link">🔗 Link 2</a><br>`;
-        if (link3) contactInfoHTML += `<a href="${link3}" target="_blank" class="contact-link">🔗 Link 3</a><br>`;
-        contactInfoHTML += '</div>';
-      }
-
       card.innerHTML = `
         <div class="title">${title}</div>
-        <div class="preview-container" data-embed="${embedUrl}">
-          <div class="preview-placeholder">Preview</div>
+        <div class="thumbnail-container" data-identifier="${identifier}">
+          <div class="thumbnail-placeholder">Thumbnail</div>
         </div>
         <div class="meta"><b>Creator:</b> ${creator}</div>
         <div class="meta"><b>Date:</b> ${date}</div>
         <div class="meta"><b>Tags:</b> ${tags}</div>
         <div class="meta"><b>Media:</b> ${mediaType}</div>
         <div class="description"><b>Description:</b> ${description}</div>
-        ${contactInfoHTML}
-        <div class="meta">
-          <a href="${reviewUrl}" target="_blank" class="reviews-link">Reviews</a>
-        </div>
         <div class="card-actions">
-          <button class="open-btn" data-embed="${embedUrl}">Open Item</button>
-          <button class="share-btn" data-share-url="${shareUrl}" data-title="${title}" data-creator="${creator}" data-description="${description}">ᯓ➤</button>
-          <button class="original-files-btn" data-identifier="${identifier}" data-username="${username}">ᯤ</button>
+          <button class="open-btn" data-identifier="${identifier}">Open Item</button>
+          <button class="share-btn" data-share-url="${shareUrl}" data-title="${title}" data-creator="${creator}" data-description="${description}">➦</button>
+          <button class="original-files-btn" data-identifier="${identifier}" data-username="${username}"></button>
         </div>
       `;
 
       card.querySelector(".open-btn").onclick = (e) => {
-        const embedUrl = e.target.dataset.embed;
-        openFullscreen(embedUrl);
+        const identifier = e.target.dataset.identifier;
+        openFullscreen(`https://archive.org/details/${identifier}`);
       };
 
       card.querySelector(".share-btn").onclick = (e) => {
@@ -673,9 +626,19 @@
         tags: tags.toLowerCase()
       });
       
-      // Observe preview for lazy loading
-      const preview = card.querySelector(".preview-container");
-      previewObserver.observe(preview);
+      // Load thumbnail
+      const thumbnailContainer = card.querySelector(".thumbnail-container");
+      const img = document.createElement("img");
+      img.src = thumbnailUrl;
+      img.alt = "Thumbnail";
+      img.loading = "lazy";
+      img.onerror = () => {
+        thumbnailContainer.innerHTML = '<div class="thumbnail-placeholder">No thumbnail</div>';
+      };
+      img.onload = () => {
+        thumbnailContainer.innerHTML = '';
+        thumbnailContainer.appendChild(img);
+      };
       
       return card;
     }
@@ -702,7 +665,7 @@
         if (meta.originalFilesCount > 1) {
           const originalFilesBtn = card.querySelector(".original-files-btn");
           originalFilesBtn.style.display = "inline-block";
-          originalFilesBtn.textContent = `ᯤ ${meta.originalFilesCount}`;
+          originalFilesBtn.textContent = `${meta.originalFilesCount}`;
         }
         
         fragment.appendChild(card);
@@ -719,7 +682,7 @@
     }
 
     // Fullscreen item functionality
-    function openFullscreen(embedUrl) {
+    function openFullscreen(url) {
       // Remove any existing overlays
       const existingOverlay = document.querySelector('.fullscreen-overlay');
       if (existingOverlay) {
@@ -734,7 +697,7 @@
       // Create iframe
       const iframe = document.createElement("iframe");
       iframe.className = "fullscreen-iframe";
-      iframe.src = embedUrl;
+      iframe.src = url;
       iframe.allowFullscreen = true;
       iframe.style.position = "fixed";
       iframe.style.top = "0";
