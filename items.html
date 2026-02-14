@@ -144,7 +144,7 @@ select, input{
   top:15px;
   right:15px;
   z-index:1000000;
-  background:rgba(255, 255, 255, 0.2);
+  background:#000000; /* Changed to full dark color */
   width:30px;
   height:30px;
   border-radius:50%;
@@ -314,7 +314,7 @@ function log(msg){
   logBox.scrollTop=logBox.scrollHeight;
 }
 
-function openViewer(embedUrl) {
+function openViewer(detailsUrl) {
   document.body.style.overflow = "hidden";
 
   const overlay = document.createElement("div");
@@ -332,7 +332,7 @@ function openViewer(embedUrl) {
   embedContainer.className = "embed-container";
   embedContainer.innerHTML = `
     <iframe
-      src="${embedUrl}"
+      src="${detailsUrl}"
       allowfullscreen
       style="width:100vw;height:100vh;border:0"
     ></iframe>
@@ -405,7 +405,7 @@ function processDoc(doc, username){
     desc: normalizeDescription(doc.description),
     tags: (doc.subject || []).toString(),
     mediaType: doc.mediatype || "unknown",
-    embedUrl: `https://archive.org/embed/${doc.identifier}`,
+    detailsUrl: `https://archive.org/details/${doc.identifier}`, // Changed to details URL
     username: username
   };
 
@@ -433,7 +433,7 @@ function createCard(item) {
       <button class="share-btn" onclick="shareItem('${item.username}', '${item.identifier}')">
         ᯓ➤ Share
       </button>
-      <button class="open-btn" onclick="openViewer('${item.embedUrl}')">
+      <button class="open-btn" onclick="openViewer('${item.detailsUrl}')">
         ⛶ Open Fullscreen
       </button>
     </div>
