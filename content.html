@@ -347,13 +347,13 @@
     let allItems = [];
     let currentFilter = "all";
     let loadedCount = 0;
-    const ITEMS_PER_LOAD = 30;
+    const ITEMS_PER_LOAD = 9;
     
     // Store identifiers for later insertion
     let identifierItems = [];
     let allIdentifiers = []; // Combined list of identifiers
-    let usedIdentifiers = new Set();
-
+    let identifierIndex = 0; // Track which identifiers we've used
+    
     // Cache for metadata
     const metadataCache = new Map();
     const thumbnailCache = new Map();
@@ -629,28 +629,12 @@
       return itemData;
     }
 
-    // Function to fetch identifiers from identifiers.html
+    // Function to fetch identifiers from identifiers.json
     async function fetchIdentifiers() {
       try {
-        const response = await fetch('identifiers.html');
-        const text = await response.text();
-        
-        // Parse the HTML content
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        
-        // Extract identifiers (assuming they are in a list or similar structure)
-        const identifiers = [];
-        const identifierElements = doc.querySelectorAll('[data-identifier]');
-        
-        identifierElements.forEach(el => {
-          const identifier = el.dataset.identifier;
-          if (identifier) {
-            identifiers.push(identifier);
-          }
-        });
-        
-        return identifiers;
+        const response = await fetch('identifiers.json');
+        const identifiers = await response.json();
+        return Array.isArray(identifiers) ? identifiers : [];
       } catch (error) {
         console.error('Error fetching identifiers:', error);
         return [];
@@ -666,7 +650,7 @@
         return;
       }
       
-      // Combine identifiers from identifiers.html with API identifiers
+      // Combine identifiers from identifiers.json with API identifiers
       allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
       
       // Create identifier items and store them
@@ -681,27 +665,14 @@
       }
     }
 
-    // Pick random identifiers ensuring no duplicates
-    function pickRandomIdentifiers(count = 3) {
+    // Pick next 3 identifiers sequentially
+    function getNextIdentifiers(count = 3) {
       if (identifierItems.length === 0) return [];
       
-      const availableIdentifiers = identifierItems.filter(item => 
-        !usedIdentifiers.has(item.element.dataset.identifier)
-      );
-      
-      if (availableIdentifiers.length < count) {
-        // Reset used set if we don't have enough unique identifiers
-        usedIdentifiers.clear();
-      }
-      
       const selected = [];
-      const tempAvailable = [...availableIdentifiers];
-      
-      for (let i = 0; i < count && tempAvailable.length > 0; i++) {
-        const randomIndex = Math.floor(Math.random() * tempAvailable.length);
-        const selectedItem = tempAvailable.splice(randomIndex, 1)[0];
-        selected.push(selectedItem);
-        usedIdentifiers.add(selectedItem.element.dataset.identifier);
+      for (let i = 0; i < count && identifierIndex < identifierItems.length; i++) {
+        selected.push(identifierItems[identifierIndex]);
+        identifierIndex++;
       }
       
       return selected;
@@ -722,9 +693,9 @@
         loadedCount++;
       });
 
-      // Insert random identifier items after each profile item
-      const randomIdentifiers = pickRandomIdentifiers(items.length);
-      randomIdentifiers.forEach((itemData, index) => {
+      // Insert next 3 identifiers from identifiers.json
+      const nextIdentifiers = getNextIdentifiers(items.length);
+      nextIdentifiers.forEach((itemData, index) => {
         if (newCards[index]) {
           newCards[index].element.after(itemData.element);
           loadedCount++;
@@ -749,23 +720,6 @@
       });
     }
 
-    // Insert identifier items in small batches
-    function insertIdentifierBatch(batchSize = 3) {
-      if (identifierItems.length === 0) return;
-      
-      const shuffledIdentifiers = [...identifierItems]
-        .sort(() => 0.5 - Math.random())
-        .slice(0, batchSize);
-      
-      shuffledIdentifiers.forEach(itemData => {
-        if (!usedIdentifiers.has(itemData.element.dataset.identifier)) {
-          grid.appendChild(itemData.element);
-          loadedCount++;
-          usedIdentifiers.add(itemData.element.dataset.identifier);
-        }
-      });
-    }
-
     // Load more items function
     async function loadMoreItems() {
       status.textContent = "Loading more content…";
@@ -773,11 +727,8 @@
       
       let loadedInThisBatch = 0;
       
-      // Insert some identifier items
-      insertIdentifierBatch(3);
-      
       // Load profile items
-      while (loadedInThisBatch < ITEMS_PER_LOAD) {
+      while (loadedInThisBatch < 3) {
         const account = pickRandomAccount();
         const result = await fetchThreeLatest(account);
         
@@ -800,10 +751,10 @@
       
       status.textContent = "Loading content…";
       
-      // Load initial 6 items immediately
+      // Load initial 3 items immediately
       let initialLoaded = 0;
       
-      while (initialLoaded < 6 && profileUrls.length > 0) {
+      while (initialLoaded < 3 && profileUrls.length > 0) {
         const account = pickRandomAccount();
         const result = await fetchThreeLatest(account);
         
@@ -812,9 +763,6 @@
           initialLoaded += result.docs.length;
         }
       }
-      
-      // Insert first batch of identifiers
-      insertIdentifierBatch(6);
       
       status.textContent = "";
     }
