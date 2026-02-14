@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -347,10 +348,10 @@
     let loadedCount = 0;
     const ITEMS_PER_LOAD = 9;
     
-    // Store identifiers from identifiers.json (without metadata initially)
-    let rawIdentifiers = []; // Store identifiers without fetching metadata
-    let processedIdentifiers = []; // Store identifiers with fetched metadata
-    let usedIdentifiers = new Set(); // Track which identifiers have been used
+    // Store identifiers for later insertion
+    let identifierItems = [];
+    let allIdentifiers = []; // Combined list of identifiers
+    let identifierIndex = 0; // Track which identifiers we've used
     
     // Cache for metadata
     const metadataCache = new Map();
@@ -535,6 +536,7 @@
       const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
+      // Removed reviewsUrl since we're removing the reviews option
       
       // Modified: Add username=yanshun081 as the last parameter for identifiers
       const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
@@ -630,8 +632,8 @@
       }
     }
 
-    // Function to store identifiers without fetching metadata
-    async function storeIdentifiers() {
+    // Function to create identifier items and store them
+    async function createIdentifierItems() {
       const identifiers = await fetchIdentifiers();
       
       if (identifiers.length === 0) {
@@ -639,51 +641,32 @@
         return;
       }
       
-      // Store raw identifiers without fetching metadata
-      rawIdentifiers = [...new Set([...rawIdentifiers, ...identifiers])];
-      console.log(`Stored ${rawIdentifiers.length} identifiers`);
-    }
-
-    // Function to pick random identifiers and fetch their metadata
-    async function fetchRandomIdentifiers(count = 3) {
-      if (rawIdentifiers.length === 0) {
-        return [];
-      }
+      // Combine identifiers from identifiers.json with API identifiers
+      allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
       
-      // Filter out already used identifiers
-      const availableIdentifiers = rawIdentifiers.filter(id => !usedIdentifiers.has(id));
-      
-      if (availableIdentifiers.length === 0) {
-        console.log('All identifiers have been used');
-        return [];
-      }
-      
-      // Pick random identifiers
-      const selectedIdentifiers = [];
-      for (let i = 0; i < Math.min(count, availableIdentifiers.length); i++) {
-        const randomIndex = Math.floor(Math.random() * availableIdentifiers.length);
-        const identifier = availableIdentifiers[randomIndex];
-        selectedIdentifiers.push(identifier);
-        usedIdentifiers.add(identifier);
-        
-        // Remove from available list after selection
-        availableIdentifiers.splice(randomIndex, 1);
-      }
-      
-      // Fetch metadata for selected identifiers
-      const processedItems = [];
-      for (const identifier of selectedIdentifiers) {
+      // Create identifier items and store them
+      for (const identifier of allIdentifiers) {
         try {
           const metadata = await fetchIdentifierMetadata(identifier);
           const itemData = createCard(identifier, metadata, null, true);
-          processedItems.push(itemData);
-          processedIdentifiers.push(itemData);
+          identifierItems.push(itemData);
         } catch (error) {
-          console.error(`Failed to process identifier item for ${identifier}:`, error);
+          console.error(`Failed to create identifier item for ${identifier}:`, error);
         }
       }
+    }
+
+    // Pick next 3 identifiers sequentially
+    function getNextIdentifiers(count = 3) {
+      if (identifierItems.length === 0) return [];
       
-      return processedItems;
+      const selected = [];
+      for (let i = 0; i < count && identifierIndex < identifierItems.length; i++) {
+        selected.push(identifierItems[identifierIndex]);
+        identifierIndex++;
+      }
+      
+      return selected;
     }
 
     function renderAccountItems(profileUrl, result) {
@@ -701,6 +684,15 @@
         loadedCount++;
       });
 
+      // Insert next 3 identifiers from identifiers.json
+      const nextIdentifiers = getNextIdentifiers(items.length);
+      nextIdentifiers.forEach((itemData, index) => {
+        if (newCards[index]) {
+          newCards[index].element.after(itemData.element);
+          loadedCount++;
+        }
+      });
+      
       // Show load more button if we've loaded initial batch
       if (loadedCount >= ITEMS_PER_LOAD) {
         loadMoreBtn.classList.remove("hidden");
@@ -712,9 +704,9 @@
       return profileUrls.every(url => accountState[url].exhausted);
     }
 
-    // Display remaining identifiers
+    // Display remaining identifiers from identifiers.json
     function displayRemainingIdentifiers() {
-      const remainingCount = rawIdentifiers.length - usedIdentifiers.size;
+      const remainingCount = identifierItems.length - identifierIndex;
       if (remainingCount <= 0) {
         status.textContent = "No more items to load.";
         return;
@@ -724,27 +716,21 @@
       
       // Load up to 9 remaining identifiers
       const batchSize = Math.min(9, remainingCount);
-      
-      // Create function to load batch
-      const loadBatch = async () => {
-        for (let i = 0; i < batchSize; i++) {
-          const identifierItems = await fetchRandomIdentifiers(1);
-          if (identifierItems.length > 0) {
-            grid.appendChild(identifierItems[0].element);
-            loadedCount++;
-          }
+      for (let i = 0; i < batchSize; i++) {
+        if (identifierIndex < identifierItems.length) {
+          grid.appendChild(identifierItems[identifierIndex].element);
+          identifierIndex++;
+          loadedCount++;
         }
-        
-        status.textContent = "";
-        
-        // Hide load more button if no more identifiers
-        if (usedIdentifiers.size >= rawIdentifiers.length) {
-          loadMoreBtn.classList.add("hidden");
-          status.textContent = "All items loaded.";
-        }
-      };
+      }
       
-      loadBatch();
+      status.textContent = "";
+      
+      // Hide load more button if no more identifiers
+      if (identifierIndex >= identifierItems.length) {
+        loadMoreBtn.classList.add("hidden");
+        status.textContent = "All items loaded.";
+      }
     }
 
     // Load more items function
@@ -779,38 +765,30 @@
       loadMoreBtn.disabled = false;
     }
 
-    // Con button functionality - display identifiers from json
-    async function loadNextIdentifiers() {
+    // Con button functionality - display next identifiers
+    function loadNextIdentifiers() {
       status.textContent = "Loading identifiers...";
-      conBtn.disabled = true;
       
-      // Fetch 3 random identifiers and display them
-      const identifierItems = await fetchRandomIdentifiers(3);
+      // Get next 3 identifiers
+      const nextIdentifiers = getNextIdentifiers(3);
       
-      if (identifierItems.length === 0) {
+      if (nextIdentifiers.length === 0) {
         status.textContent = "No more identifiers to load.";
-        conBtn.disabled = false;
         return;
       }
       
       // Append to grid
-      identifierItems.forEach(itemData => {
+      nextIdentifiers.forEach(itemData => {
         grid.appendChild(itemData.element);
         loadedCount++;
       });
       
       status.textContent = "";
-      conBtn.disabled = false;
-      
-      // Show load more button if we've loaded enough items
-      if (loadedCount >= ITEMS_PER_LOAD) {
-        loadMoreBtn.classList.remove("hidden");
-      }
     }
 
     async function initialLoad() {
-      // Start loading identifiers in background (no metadata fetching)
-      await storeIdentifiers();
+      // Start loading identifiers in background (no await)
+      await createIdentifierItems();
       
       status.textContent = "Click the button Load More or Content";
       
