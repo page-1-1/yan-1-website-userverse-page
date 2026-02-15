@@ -233,7 +233,7 @@
     }
     
     .preview-container {
-      height: 200px; /* Increased height */
+      height: 200px;
       margin: 5px 0;
       border-radius: 8px;
       overflow: hidden;
@@ -351,8 +351,8 @@
   <div class="subtitle" id="subtitle"></div>
 
   <div class="btn-container">
-    <button id="profile-items-btn" class="action-btn">Profile Items</button>
-    <button id="yan-1-items-btn" class="action-btn">Yan_1 Items</button>
+    <button id="profile-items-btn" class="action-btn active">Profile Items</button>
+    <button id="yan1-items-btn" class="action-btn">YAN_1 Items</button>
   </div>
 
   <div class="grid-container">
@@ -372,24 +372,19 @@
     const loadMoreBtn = document.getElementById("load-more");
     const sectionTitle = document.getElementById("section-title");
     const profileItemsBtn = document.getElementById("profile-items-btn");
-    const yan1ItemsBtn = document.getElementById("yan-1-items-btn");
+    const yan1ItemsBtn = document.getElementById("yan1-items-btn");
 
     // Store all items for filtering
     let allItems = [];
     let loadedCount = 0;
     const ITEMS_PER_LOAD = 9;
     
-    // Store identifiers for later insertion
-    let identifierItems = [];
-    let allIdentifiers = []; // Combined list of identifiers
-    let identifierIndex = 0; // Track which identifiers we've used
-    
     // Cache for metadata
     const metadataCache = new Map();
     const thumbnailCache = new Map();
 
     // Current view state
-    let currentView = 'profile'; // 'profile' or 'yan1'
+    let currentView = 'profile';
 
     // Get thumbnail URL
     function getThumbnailUrl(identifier) {
@@ -563,25 +558,19 @@
       return fallbackMetadata;
     }
 
-    function createCard(identifier, metadata, username = null, isIdentifierItem = false) {
+    function createCard(identifier, metadata, username = null) {
       const title = metadata.title || identifier;
       const creator = metadata.creator || "Unknown";
       const date = metadata.publicdate || "N/A";
       const tags = metadata.subject ? (Array.isArray(metadata.subject) ? metadata.subject.join(", ") : metadata.subject.toString()).slice(0, 100) : "None";
       const mediaType = metadata.mediatype || "unknown";
       const description = metadata.description ? metadata.description.toString() : "No description";
-      // Removed reviewsUrl since we're removing the reviews option
       
-      // Modified: Add username=yanshun081 as the last parameter for identifiers
-      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}` + 
-        (username ? `&username=${username}` : `&username=yanshun081`);
+      const shareUrl = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${identifier}&username=${username || 'yanshun081'}`;
 
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.mediatype = mediaType;
-      if (isIdentifierItem) {
-        card.dataset.isIdentifier = "true";
-      }
 
       let metaHtml = `
         <div class="title">${title}</div>
@@ -593,7 +582,6 @@
         <div class="meta"><b>Creator:</b> ${creator}</div>
       `;
 
-      // Only show username if provided (for profile items)
       if (username) {
         metaHtml += `<div class="username-meta"><b>Username:</b> @${username}</div>`;
       }
@@ -602,9 +590,6 @@
         <div class="meta"><b>Date:</b> ${date}</div>
         <div class="meta"><b>Tags:</b> ${tags}</div>
         <div class="meta"><b>Media:</b> ${mediaType}</div>
-      `;
-
-      metaHtml += `
         <div class="description-full">${description}</div>
         <div class="card-actions">
           <button class="open-btn">Open Item</button>
@@ -615,25 +600,21 @@
       card.innerHTML = metaHtml;
 
       card.querySelector(".open-btn").onclick = () => {
-        // Open direct page in iframe instead of embed
         openFullscreen(`https://archive.org/details/${identifier}`);
       };
 
       card.querySelector(".share-btn").onclick = (e) => {
         const shareUrl = e.target.dataset.shareUrl;
-        // Check if Web Share API is available
         if (navigator.share) {
           navigator.share({
             title: title,
             url: shareUrl
           }).catch(console.error);
         } else {
-          // Fallback to clipboard
           navigator.clipboard.writeText(shareUrl).then(() => {
             alert("Share link copied to clipboard!");
           }).catch(err => {
             console.error('Failed to copy: ', err);
-            // Fallback prompt
             prompt("Copy this link to share:", shareUrl);
           });
         }
@@ -642,8 +623,7 @@
       // Store item for filtering
       const itemData = {
         element: card,
-        mediatype: mediaType,
-        isIdentifier: isIdentifierItem
+        mediatype: mediaType
       };
       allItems.push(itemData);
       
@@ -654,66 +634,14 @@
       return itemData;
     }
 
-    // Function to fetch identifiers from identifiers.json
-    async function fetchIdentifiers() {
-      try {
-        const response = await fetch('identifiers.json');
-        const identifiers = await response.json();
-        return Array.isArray(identifiers) ? identifiers : [];
-      } catch (error) {
-        console.error('Error fetching identifiers:', error);
-        return [];
-      }
-    }
-
-    // Function to create identifier items and store them
-    async function createIdentifierItems() {
-      const identifiers = await fetchIdentifiers();
-      
-      if (identifiers.length === 0) {
-        console.log('No identifiers found');
-        return;
-      }
-      
-      // Combine identifiers from identifiers.json with API identifiers
-      allIdentifiers = [...new Set([...allIdentifiers, ...identifiers])];
-      
-      // Create identifier items and store them
-      for (const identifier of allIdentifiers) {
-        try {
-          const metadata = await fetchIdentifierMetadata(identifier);
-          const itemData = createCard(identifier, metadata, null, true);
-          identifierItems.push(itemData);
-        } catch (error) {
-          console.error(`Failed to create identifier item for ${identifier}:`, error);
-        }
-      }
-    }
-
-    // Pick next 3 identifiers sequentially
-    function getNextIdentifiers(count = 3) {
-      if (identifierItems.length === 0) return [];
-      
-      const selected = [];
-      for (let i = 0; i < count && identifierIndex < identifierItems.length; i++) {
-        selected.push(identifierItems[identifierIndex]);
-        identifierIndex++;
-      }
-      
-      return selected;
-    }
-
     function renderAccountItems(profileUrl, result) {
       const state = accountState[profileUrl];
       const items = result.docs;
       const username = result.username;
       
-      // Create cards for all items
-      const newCards = [];
       items.forEach((meta, index) => {
         const identifier = meta.identifier;
-        const itemData = createCard(identifier, meta, username, false);
-        newCards.push(itemData);
+        const itemData = createCard(identifier, meta, username);
         grid.appendChild(itemData.element);
         loadedCount++;
       });
@@ -754,40 +682,11 @@
       loadMoreBtn.disabled = false;
     }
 
-    // Load Yan_1 items function
-    async function loadYan1Items() {
-      status.textContent = "Loading Yan_1 items...";
-      
-      // Fetch identifiers if not already fetched
-      if (allIdentifiers.length === 0) {
-        await createIdentifierItems();
-      }
-      
-      // Get 5 random identifiers
-      const shuffled = [...allIdentifiers].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, 5);
-      
-      // Fetch metadata for these identifiers
-      for (const identifier of selected) {
-        try {
-          const metadata = await fetchIdentifierMetadata(identifier);
-          const itemData = createCard(identifier, metadata, null, true);
-          grid.appendChild(itemData.element);
-          loadedCount++;
-        } catch (error) {
-          console.error(`Failed to load Yan_1 item for ${identifier}:`, error);
-        }
-      }
-      
-      status.textContent = "";
-    }
-
     // Clear grid and reset state
     function clearGrid() {
       grid.innerHTML = '';
       allItems = [];
       loadedCount = 0;
-      identifierIndex = 0;
     }
 
     // Switch to profile items view
@@ -803,17 +702,10 @@
       loadMoreProfileItems();
     }
 
-    // Switch to Yan_1 items view
+    // Show YAN_1 Items in fullscreen
     function showYan1Items() {
-      currentView = 'yan1';
-      clearGrid();
-      sectionTitle.textContent = "Yan_1 Items";
-      loadMoreBtn.classList.add("hidden");
-      yan1ItemsBtn.classList.add("active");
-      profileItemsBtn.classList.remove("active");
-      
-      // Load Yan_1 items
-      loadYan1Items();
+      // Navigate to yan_1_items.html in fullscreen mode
+      window.location.href = 'yan_1_items.html';
     }
 
     async function initialLoad() {
