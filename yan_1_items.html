@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Identifiers Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<style>
+body {
+  margin: 0;
+  padding: 20px;
+  background: #0f172a;
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+h1 { margin: 0; }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+#refreshBtn {
+  background: #3b82f6;
+  color: white;
+  padding: 8px 14px;
+}
+
+#refreshBtn:hover { background: #2563eb; }
+
+#status {
+  text-align: center;
+  margin: 20px 0;
+  color: #94a3b8;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.card {
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.card img {
+  width: 100%;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.meta {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.desc {
+  margin-top: 6px;
+}
+
+.expand {
+  color: #3b82f6;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.openBtn {
+  background: #22c55e;
+  color: white;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.openBtn:hover { background: #16a34a; }
+
+.shareBtn {
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#loadMoreBtn {
+  display: block;
+  margin: 20px auto;
+  padding: 10px 18px;
+  background: #22c55e;
+  color: white;
+}
+
+#viewerOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: none;
+  z-index: 9999;
+}
+
+#viewerIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+#closeViewer {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 28px;
+  font-weight: bold;
+  color: red;
+  cursor: pointer;
+  z-index: 10000;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Identifiers</h1>
+  <button id="refreshBtn">Refresh</button>
+</header>
+
+<div id="status">Loading...</div>
+<div id="grid"></div>
+<button id="loadMoreBtn" style="display:none;">Load More</button>
+
+<div id="viewerOverlay">
+  <div id="closeViewer">✖</div>
+  <iframe id="viewerIframe"></iframe>
+</div>
+
+<script>
+const WORKER_URL = "https://identifiers-worker.video-api-ajaiahar.workers.dev";
+const METADATA_API_BASE = "https://archive.org/metadata/";
+const STORAGE_KEY = "identifiers_storage";
+const ITEMS_PER_LOAD = 15;
+
+const gridEl = document.getElementById("grid");
+const statusEl = document.getElementById("status");
+const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+const viewerOverlay = document.getElementById("viewerOverlay");
+const viewerIframe = document.getElementById("viewerIframe");
+const closeViewer = document.getElementById("closeViewer");
+
+let allIdentifiers = [];
+let currentIndex = 0;
+
+/* Lazy loading */
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const card = entry.target;
+      fetchMetadata(card.dataset.identifier, card);
+      observer.unobserve(card);
+    }
+  });
+}, { rootMargin: "200px" });
+
+async function fetchMetadata(identifier, card) {
+  try {
+    const res = await fetch(METADATA_API_BASE + identifier);
+    const data = await res.json();
+    const meta = data.metadata || {};
+
+    const title = meta.title || "N/A";
+    const creator = meta.creator || "N/A";
+    const date = meta.date || "N/A";
+    const tags = Array.isArray(meta.subject) ? meta.subject.join(", ") : (meta.subject || "N/A");
+    const mediatype = meta.mediatype || "N/A";
+    const thumb = `https://archive.org/services/img/${identifier}`;
+
+    /* SAFE DESCRIPTION HANDLING */
+    let fullDesc = "N/A";
+
+    if (meta.description) {
+      if (Array.isArray(meta.description)) {
+        fullDesc = meta.description.join(" ");
+      } else {
+        fullDesc = meta.description.toString();
+      }
+    }
+
+    /* Remove HTML tags */
+    fullDesc = fullDesc.replace(/<[^>]*>/g, "").trim();
+
+    /* Limit to 100 visible characters */
+    const shortDesc = fullDesc.length > 100
+      ? fullDesc.substring(0, 100)
+      : fullDesc;
+
+    card.innerHTML = `
+      <img src="${thumb}">
+      <div class="meta">
+        <strong>${title}</strong>
+        <div><strong>Media:</strong> ${mediatype}</div>
+        <div><strong>Creator:</strong> ${creator}</div>
+        <div><strong>Date:</strong> ${date}</div>
+        <div><strong>Tags:</strong> ${tags}</div>
+        <div class="desc">
+          ${shortDesc}
+          ${fullDesc.length > 100 ? '<span class="expand">...</span>' : ''}
+        </div>
+        <div class="actions">
+          <button class="openBtn">Open Item</button>
+          <span class="shareBtn">ᯓ➤</span>
+        </div>
+      </div>
+    `;
+
+    /* Expand description */
+    const expandBtn = card.querySelector(".expand");
+    if (expandBtn) {
+      expandBtn.addEventListener("click", () => {
+        expandBtn.parentElement.innerHTML = fullDesc;
+      });
+    }
+
+    /* Open item */
+    card.querySelector(".openBtn").addEventListener("click", () => {
+      viewerIframe.src = "https://archive.org/details/" + identifier;
+      viewerOverlay.style.display = "block";
+    });
+
+    /* Share link */
+    card.querySelector(".shareBtn").addEventListener("click", async () => {
+      const shareURL =
+      "https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?username=yanshun081&identifier=" + identifier;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title,
+            text: "Check this archive item",
+            url: shareURL
+          });
+        } catch {}
+      } else {
+        await navigator.clipboard.writeText(shareURL);
+        alert("Link copied to clipboard");
+      }
+    });
+
+  } catch {
+    card.innerHTML = "Metadata failed.";
+  }
+}
+
+function renderNextBatch() {
+  const next = allIdentifiers.slice(currentIndex, currentIndex + ITEMS_PER_LOAD);
+
+  next.forEach(identifier => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.identifier = identifier;
+    card.innerHTML = "Loading...";
+    gridEl.appendChild(card);
+    observer.observe(card);
+  });
+
+  currentIndex += ITEMS_PER_LOAD;
+  loadMoreBtn.style.display =
+    currentIndex >= allIdentifiers.length ? "none" : "block";
+}
+
+function initializeDisplay(data) {
+  gridEl.innerHTML = "";
+  currentIndex = 0;
+  allIdentifiers = [...data].sort();
+  renderNextBatch();
+}
+
+async function fetchFromWorker() {
+  statusEl.textContent = "Fetching identifiers...";
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "hello" })
+    });
+
+    const result = await res.json();
+
+    if (result.identifiers) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(result.identifiers));
+      initializeDisplay(result.identifiers);
+      statusEl.textContent = "Loaded ✔";
+    }
+  } catch {
+    statusEl.textContent = "Error loading identifiers.";
+  }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  localStorage.removeItem(STORAGE_KEY);
+  gridEl.innerHTML = "";
+  fetchFromWorker();
+});
+
+loadMoreBtn.addEventListener("click", renderNextBatch);
+
+closeViewer.addEventListener("click", () => {
+  viewerOverlay.style.display = "none";
+  viewerIframe.src = "";
+});
+
+window.addEventListener("load", () => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    initializeDisplay(JSON.parse(stored));
+    statusEl.textContent = "Loaded from storage ✔";
+  } else {
+    fetchFromWorker();
+  }
+});
+</script>
+
+</body>
+</html>
