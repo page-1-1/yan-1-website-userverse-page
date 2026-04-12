@@ -13,10 +13,32 @@
       color: #e5e7eb;
       font-family: system-ui, -apple-system, BlinkMacSystemFont;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       position: relative;
       overflow: hidden;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 1rem;
+      z-index: 10;
+    }
+
+    .website-title {
+      font-size: 2.5rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .tagline {
+      font-size: 1.1rem;
+      opacity: 0.85;
+      margin-top: 0.5rem;
     }
 
     .container {
@@ -133,15 +155,30 @@
       height: 100%;
       border: none;
     }
+    
+    .footer {
+      position: absolute;
+      bottom: 20px;
+      text-align: center;
+      width: 100%;
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
   <button class="home-btn" onclick="goHome()">🏠</button>
   <button class="refresh-btn" onclick="refreshMetadata()">↻ Refresh</button>
 
+  <div class="header">
+    <div class="website-title">🌌 Userverse</div>
+    <div class="tagline">Discover, create, and connect—join our platform today.</div>
+  </div>
+
   <div class="container">
     <div class="option" onclick="openProfiles()">Profiles</div>
     <div class="option" onclick="openContent()">Content</div>
+    <div class="option" onclick="openAccount()">Create Account</div>
     <div class="status" id="status">Loading archive metadata…</div>
   </div>
   
@@ -149,6 +186,10 @@
   <div class="iframe-container" id="iframeContainer">
     <button class="close-btn" onclick="closeIframe()">×</button>
     <iframe id="fullscreenIframe" class="fullscreen-iframe" src=""></iframe>
+  </div>
+  
+  <div class="footer">
+    © 2026 Loopix · Built with ❤️ by YAN
   </div>
 
   <script>
@@ -217,6 +258,10 @@
 
     function openContent() {
       window.location.href = "content.html";
+    }
+
+    function openAccount() {
+      window.location.href = "account.html";
     }
 
     function refreshMetadata() {
