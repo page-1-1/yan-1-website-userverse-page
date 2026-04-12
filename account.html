@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Manager</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  .container {
+    width: 350px;
+    text-align: center;
+  }
+
+  h1 {
+    margin-bottom: 20px;
+  }
+
+  button {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .create {
+    background: #22c55e;
+    box-shadow: 0 0 15px #22c55e, 0 0 10px #22c55e;
+    animation: pulse 2s infinite;
+  }
+
+  .delete {
+    background: #ef4444;
+    box-shadow: 0 0 15px #ef4444, 0 0 10px #ef4444;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 15px currentColor, 0 0 10px currentColor;
+    }
+    50% {
+      box-shadow: 0 0 25px currentColor, 0 0 20px currentColor;
+    }
+    100% {
+      box-shadow: 0 0 15px currentColor, 0 0 10px currentColor;
+    }
+  }
+
+  .create:hover {
+    background: #16a34a;
+    transform: scale(1.03);
+  }
+
+  .delete:hover {
+    background: #dc2626;
+    transform: scale(1.03);
+  }
+
+  form {
+    display: none;
+    margin-top: 20px;
+    text-align: left;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: none;
+  }
+
+  .submit-btn {
+    background: #38bdf8;
+    color: #000;
+    font-weight: bold;
+  }
+
+  .message {
+    margin-top: 15px;
+    font-size: 14px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>Account Manager</h1>
+
+  <button class="create" onclick="showForm('create')">Create Account</button>
+  <button class="delete" onclick="showForm('delete')">Delete Account</button>
+
+  <!-- FORM -->
+  <form id="form">
+    <input type="email" id="email" placeholder="Enter Email" required>
+    <input type="text" id="url" placeholder="Archive Profile URL" required>
+    <input type="password" id="password" placeholder="Enter Password" required>
+
+    <button type="button" class="submit-btn" onclick="submitForm()">Submit</button>
+  </form>
+
+  <div class="message" id="message"></div>
+</div>
+
+<script>
+  let currentAction = "";
+
+  function showForm(action) {
+    currentAction = action;
+    document.getElementById("form").style.display = "block";
+    document.getElementById("message").innerText = "";
+  }
+
+  function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  function submitForm() {
+    const email = document.getElementById("email").value.trim();
+    const url = document.getElementById("url").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const messageBox = document.getElementById("message");
+
+    // Email validation
+    if (!validateEmail(email)) {
+      messageBox.innerText = "❌ Invalid email format";
+      messageBox.style.color = "red";
+      return;
+    }
+
+    // URL validation
+    if (!url.endsWith("/uploads")) {
+      messageBox.innerText = "❌ URL must end with /uploads";
+      messageBox.style.color = "red";
+      return;
+    }
+
+    let payload = {};
+
+    if (currentAction === "create") {
+      payload = {
+        message: "account_create_details",
+        email: email,
+        archive_profile_url: url,
+        password: password
+      };
+    } else if (currentAction === "delete") {
+      payload = {
+        message: "account_delete_details",
+        email: email,
+        archive_profile_url: url,
+        password: password
+      };
+    } else {
+      messageBox.innerText = "❌ Select an option first";
+      messageBox.style.color = "red";
+      return;
+    }
+
+    // ✅ UPDATED BACKEND URL HERE
+    fetch("https://archive-profiles-urls-create-delete-backend.ajaia-backend.workers.dev", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        messageBox.innerText = "✅ " + data.message;
+        messageBox.style.color = "#22c55e";
+
+        // Clear form after success
+        document.getElementById("email").value = "";
+        document.getElementById("url").value = "";
+        document.getElementById("password").value = "";
+      } else {
+        messageBox.innerText = "❌ " + data.message;
+        messageBox.style.color = "red";
+      }
+    })
+    .catch(err => {
+      messageBox.innerText = "❌ Error: " + err.message;
+      messageBox.style.color = "red";
+    });
+  }
+</script>
+
+</body>
+</html>
