@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Loading...</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+
+<h2>Loading your content...</h2>
+
+<script>
+async function loadData() {
+    try {
+        // 🔥 Fetch data.json
+        const response = await fetch('data.json');
+        const data = await response.json();
+
+        // 🧠 Convert to required format (IMPORTANT FIX)
+        const simplifiedData = data.map(item => ({
+            title: item.title || "",
+            type: item.media_type || ""   // ✅ FIXED KEY
+        }));
+
+        // 🧹 Optional: clear old data
+        localStorage.removeItem("archiveData");
+
+        // 💾 Store in localStorage
+        localStorage.setItem("archiveData", JSON.stringify(simplifiedData));
+
+        // 🔁 Redirect to display page
+        window.location.href = "archive_identifiers_displaying.html";
+
+    } catch (error) {
+        console.error("Error loading JSON:", error);
+        document.body.innerHTML = "<h2>❌ Error loading data</h2>";
+    }
+}
+
+// ▶️ Run on page load
+loadData();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dynamic Archive Loader</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial;
+  background:#0f172a;
+  color:#e5e7eb;
+  margin:0;
+  padding:20px;
+}
+
+/* Header */
+.topbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+
+.home {
+  font-size:26px;
+  cursor:pointer;
+}
+
+/* Bigger Search Button */
+.search {
+  text-align:center;
+  cursor:pointer;
+  background:#38bdf8;
+  padding:12px 20px;
+  border-radius:8px;
+  font-size:18px;
+  width:200px;
+  margin:10px auto 20px auto;
+}
+
+/* Additional Button */
+.reels-btn {
+  text-align:center;
+  cursor:pointer;
+  background:#f97316;
+  padding:12px 20px;
+  border-radius:8px;
+  font-size:18px;
+  width:50px;
+  margin:10px auto 20px auto;
+  display:inline-block;
+}
+
+h1 { text-align:center; }
+
+/* Grid */
+#container {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:15px;
+}
+
+.card {
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #334155;
+}
+
+/* Random title color */
+.card h3 {
+  color: hsl(calc(360 * var(--rand)), 80%, 70%);
+}
+
+img {
+  width:100%;
+  border-radius:8px;
+}
+
+/* Buttons row */
+.actions {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:10px;
+}
+
+.openBtn {
+  padding:8px 15px;
+  border:none;
+  border-radius:6px;
+  background:#38bdf8;
+  cursor:pointer;
+}
+
+.shareBtn {
+  font-size:20px;
+  cursor:pointer;
+}
+
+/* Load more */
+button {
+  display:block;
+  margin:30px auto;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  background:#38bdf8;
+  cursor:pointer;
+}
+
+/* Fullscreen iframe */
+#viewer {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  display:none;
+  z-index:999;
+}
+
+#viewer iframe {
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+#closeViewer {
+  position:absolute;
+  top:10px;
+  right:15px;
+  color:#fff;
+  font-size:25px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="home" onclick="goHome()">🏠</div>
+</div>
+
+<h1>📦 Smart Archive Feed</h1>
+
+<div style="text-align:center;">
+  <div class="search" onclick="openSearch()">🔍 Search</div>
+  <div class="reels-btn" onclick="openReels()">1</div>
+</div>
+
+<div id="container"></div>
+<button id="loadMore">Load More</button>
+
+<!-- Viewer -->
+<div id="viewer">
+  <div id="closeViewer" onclick="closeViewer()">X</div>
+  <iframe id="frame"></iframe>
+</div>
+
+<script>
+
+// Load stored data
+const SOURCE_DATA = JSON.parse(localStorage.getItem("archiveData")) || [];
+if (!SOURCE_DATA.length) {
+  document.body.innerHTML = "<h2>No data found</h2>";
+  throw new Error("No data");
+}
+
+let pageTracker = {};
+
+// Random 10
+function getRandomBatch() {
+  return [...SOURCE_DATA].sort(() => 0.5 - Math.random()).slice(0,10);
+}
+
+// Process
+async function processBatch() {
+  const batch = getRandomBatch();
+  for (let item of batch) {
+    await fetchAndDisplay(item.title, item.type);
+  }
+}
+
+// Fetch
+async function fetchAndDisplay(title, type) {
+  const key = title + "_" + type;
+  if (!pageTracker[key]) pageTracker[key] = 1;
+
+  const page = pageTracker[key];
+  const query = `title:(${title}) AND mediatype:${type}`;
+
+  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier&fl[]=title&fl[]=description&page=${page}&rows=5&output=json`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const items = data.response.docs;
+
+    items.forEach(it => createCard(it, type));
+
+    pageTracker[key]++;
+  } catch(err) {
+    console.log(err);
+  }
+}
+
+// Create card
+function createCard(item, type) {
+
+  const id = item.identifier;
+  const title = item.title || "No Title";
+
+  let desc = "No description";
+  if (item.description) {
+    desc = Array.isArray(item.description) ? item.description[0] : item.description;
+    desc = desc.substring(0,100);
+  }
+
+  const thumb = `https://archive.org/services/img/${id}`;
+
+  const div = document.createElement("div");
+  div.className = "card";
+  div.style.setProperty('--rand', Math.random());
+
+  div.innerHTML = `
+    <img src="${thumb}">
+    <h3>${title}</h3>
+    <p><b>Type:</b> ${type}</p>
+    <p>${desc}</p>
+
+    <div class="actions">
+      <button class="openBtn" onclick="openViewer('${id}')">Open</button>
+      <div class="shareBtn" onclick="share('${id}')">ᯓ➤</div>
+    </div>
+  `;
+
+  document.getElementById("container").appendChild(div);
+}
+
+// Home
+function goHome() {
+  window.open("https://yan-shun-081.github.io/yan-1-website.com/", "_blank");
+}
+
+// Search
+function openSearch() {
+  window.open("search.html", "_blank");
+}
+
+// Reels
+function openReels() {
+  window.open("reels.html", "_blank"); // Replace with actual URL if needed
+}
+
+// Share (Web Share API)
+async function share(id) {
+  const link = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${id}&username=yanshun081`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Check this out",
+        url: link
+      });
+    } catch (err) {
+      console.log("Share cancelled");
+    }
+  } else {
+    // fallback
+    navigator.clipboard.writeText(link);
+    alert("Link copied!");
+  }
+}
+
+// Viewer
+function openViewer(id) {
+  document.getElementById("frame").src = `https://archive.org/details/${id}`;
+  document.getElementById("viewer").style.display = "block";
+}
+
+function closeViewer() {
+  document.getElementById("viewer").style.display = "none";
+  document.getElementById("frame").src = "";
+}
+
+// Init
+processBatch();
+
+// Load more
+document.getElementById("loadMore").onclick = () => {
+  processBatch();
+};
+
+</script>
+
+</body>
+</html>

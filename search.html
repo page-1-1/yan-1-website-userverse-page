@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Archive Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:Arial;
+}
+
+/* Top bar centered */
+.topbar{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:10px;
+  padding:15px;
+  flex-wrap:wrap;
+  position:relative;
+}
+
+/* Home button left */
+#home{
+  position:absolute;
+  left:15px;
+  font-size:22px;
+  cursor:pointer;
+}
+
+/* Inputs */
+select, input, button{
+  padding:10px;
+  border-radius:6px;
+  border:none;
+  font-size:14px;
+}
+
+input{
+  min-width:200px;
+}
+
+button{
+  background:#38bdf8;
+  cursor:pointer;
+}
+
+/* Grid */
+#grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:12px;
+  padding:12px;
+}
+
+/* Card */
+.card{
+  background:#111;
+  border-radius:10px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+/* FULL SIZE IMAGE */
+.card img{
+  width:100%;
+  height:180px;
+  object-fit:cover;
+}
+
+/* Title */
+.card-title{
+  padding:6px;
+  font-size:14px;
+  color:#38bdf8;
+}
+
+/* Description */
+.card-desc{
+  padding:6px;
+  font-size:12px;
+  color:#ccc;
+  height:40px;
+  overflow:hidden;
+}
+
+/* Actions */
+.actions{
+  display:flex;
+  justify-content:space-between;
+  padding:6px;
+}
+
+.actions button{
+  font-size:12px;
+}
+
+/* Viewer */
+#viewerOverlay{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  display:none;
+  z-index:999;
+}
+
+#viewerOverlay iframe{
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+/* Close */
+#closeBtn{
+  position:absolute;
+  top:10px;
+  right:10px;
+  font-size:22px;
+  cursor:pointer;
+  z-index:1000;
+}
+
+/* Responsive */
+@media(max-width:600px){
+  .card img{
+    height:140px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+
+  <div id="home" onclick="goHome()">🏠</div>
+
+  <select id="mediaSelect">
+    <option value="">ALL TYPES</option>
+    <option value="movies">MOVIES</option>
+    <option value="audio">AUDIO</option>
+    <option value="texts">TEXTS</option>
+    <option value="image">IMAGES</option>
+    <option value="software">SOFTWARE</option>
+    <option value="user">USERNAME</option>
+  </select>
+
+  <input type="text" id="searchInput" placeholder="Search..." onkeydown="handleEnter(event)">
+
+  <button onclick="search()">Search</button>
+
+</div>
+
+<!-- GRID -->
+<div id="grid"></div>
+
+<!-- VIEWER -->
+<div id="viewerOverlay">
+  <div id="closeBtn" onclick="closeViewer()">❌</div>
+  <iframe id="frame"></iframe>
+</div>
+
+<script>
+
+let page = 1;
+let loading = false;
+let currentQuery = "";
+
+// 🏠 Home
+function goHome(){
+  window.open("https://yan-shun-081.github.io/yan-1-website.com/","_blank");
+}
+
+// 🔥 Query Builder
+function buildQuery(){
+
+  const text = document.getElementById("searchInput").value.trim();
+  const type = document.getElementById("mediaSelect").value;
+
+  let q = "*:*";
+
+  // 👤 USERNAME SEARCH
+  if(type === "user" && text){
+    q = `(creator:(${text})^6 OR uploader:(${text})^6)`;
+  }
+
+  // 🔍 TEXT SEARCH
+  else if(text){
+    q = `(title:(${text})^6 OR identifier:(${text})^5 OR description:(${text})^3)`;
+  }
+
+  // 🎯 MEDIA FILTER
+  if(type && type !== "user"){
+    q += ` AND mediatype:${type}`;
+  }
+
+  return q;
+}
+
+// 🚀 Fetch Data
+async function fetchData(){
+
+  if(loading) return;
+  loading = true;
+
+  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQuery)}&fl[]=identifier&fl[]=title&fl[]=description&fl[]=mediatype&sort[]=downloads desc&sort[]=addeddate desc&page=${page}&rows=30&output=json`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  render(data.response.docs);
+
+  page++;
+  loading = false;
+}
+
+// 🖼️ Render Cards
+function render(docs){
+
+  const grid = document.getElementById("grid");
+
+  docs.forEach(item => {
+
+    const id = item.identifier;
+    const title = item.title || "No Title";
+    const desc = item.description ? item.description.toString().slice(0,80) : "No description";
+    const type = item.mediatype || "unknown";
+
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <img loading="lazy" src="https://archive.org/services/img/${id}">
+      <div class="card-title">${title}</div>
+      <div class="card-desc">${desc}</div>
+      <div class="card-desc" style="color:#38bdf8;">${type}</div>
+      <div class="actions">
+        <button onclick="openItem('${id}')">Open</button>
+        <button onclick="shareItem('${id}')">ᯓ➤</button>
+      </div>
+    `;
+
+    grid.appendChild(div);
+  });
+}
+
+// ▶️ Open Fullscreen
+function openItem(id){
+
+  const overlay = document.getElementById("viewerOverlay");
+  const frame = document.getElementById("frame");
+
+  frame.src = `https://archive.org/details/${id}`;
+  overlay.style.display = "block";
+
+  if(overlay.requestFullscreen){
+    overlay.requestFullscreen();
+  }
+}
+
+// ❌ Close
+function closeViewer(){
+
+  const overlay = document.getElementById("viewerOverlay");
+  overlay.style.display = "none";
+
+  if(document.fullscreenElement){
+    document.exitFullscreen();
+  }
+}
+
+// 🔗 Share
+function shareItem(id){
+
+  const link = `https://yan-1-related-1.github.io/yan-1-website-shared-links-redirecting/archive-identifier-page-shared-links-redirecting.html?identifier=${id}&username=yanshun081`;
+
+  if(navigator.share){
+    navigator.share({
+      title:"Check this",
+      url:link
+    });
+  }else{
+    prompt("Copy link:", link);
+  }
+}
+
+// 🔍 Search
+async function search(){
+
+  document.getElementById("grid").innerHTML = "";
+
+  page = 1;
+  currentQuery = buildQuery();
+
+  await fetchData();
+}
+
+// ⌨️ Enter Key
+function handleEnter(e){
+  if(e.key === "Enter"){
+    search();
+  }
+}
+
+// ⚡ Lazy Load
+window.addEventListener("scroll", () => {
+  if(window.innerHeight + window.scrollY >= document.body.offsetHeight - 200){
+    fetchData();
+  }
+});
+
+// 🚀 Init
+search();
+
+</script>
+
+</body>
+</html>
