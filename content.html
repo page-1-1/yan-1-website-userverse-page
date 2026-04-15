@@ -353,6 +353,7 @@
   <div class="btn-container">
     <button id="profile-items-btn" class="action-btn active">Profile Items</button>
     <button id="yan1-items-btn" class="action-btn">YAN_1 Items</button>
+    <button id="archive-feed-btn" class="action-btn">Archive Feed</button>
   </div>
 
   <div class="grid-container">
@@ -373,6 +374,7 @@
     const sectionTitle = document.getElementById("section-title");
     const profileItemsBtn = document.getElementById("profile-items-btn");
     const yan1ItemsBtn = document.getElementById("yan1-items-btn");
+    const archiveFeedBtn = document.getElementById("archive-feed-btn");
 
     // Store all items for filtering
     let allItems = [];
@@ -697,6 +699,7 @@
       loadMoreBtn.classList.remove("hidden");
       profileItemsBtn.classList.add("active");
       yan1ItemsBtn.classList.remove("active");
+      archiveFeedBtn.classList.remove("active");
       
       // Load initial profile items
       loadMoreProfileItems();
@@ -706,6 +709,12 @@
     function showYan1Items() {
       // Navigate to yan_1_items.html in fullscreen mode
       window.location.href = 'yan_1_items.html';
+    }
+
+    // Show Archive Feed
+    function showArchiveFeed() {
+      // Navigate to archive_identifiers.html
+      window.location.href = 'archive_identifiers.html';
     }
 
     async function initialLoad() {
@@ -747,6 +756,7 @@
     
     profileItemsBtn.addEventListener("click", showProfileItems);
     yan1ItemsBtn.addEventListener("click", showYan1Items);
+    archiveFeedBtn.addEventListener("click", showArchiveFeed);
 
     // Initialize
     initialLoad().catch(err => {
